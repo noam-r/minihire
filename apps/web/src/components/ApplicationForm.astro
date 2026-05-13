@@ -23,6 +23,7 @@ const maxCvSizeMegabytes = Math.round((maxCvSizeBytes / (1024 * 1024)) * 10) / 1
   method="post"
   enctype="multipart/form-data"
   novalidate
+  data-job-slug={jobSlug}
 >
   <input type="hidden" name="job_slug" value={jobSlug} />
   <input type="hidden" name={FORM_STARTED_AT_FIELD} value={formStartedAt} />
@@ -256,7 +257,8 @@ const maxCvSizeMegabytes = Math.round((maxCvSizeBytes / (1024 * 1024)) * 10) / 1
         const payload = await response.json().catch(() => null);
 
         if (payload?.ok) {
-          window.location.assign(`/jobs/${jobSlug}/apply/success`);
+          const slug = form.dataset.jobSlug ?? "";
+          window.location.assign(`/jobs/${encodeURIComponent(slug)}/apply/success`);
           return;
         }
 

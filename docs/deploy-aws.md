@@ -88,9 +88,10 @@ Edit `.env` on the server (use SSM Parameter Store or Secrets Manager in real op
 | `RESEND_API_KEY` | Production key |
 | `FORM_SIGNING_SECRET` | Long random string |
 | `APPLICATION_EMAIL_FROM` / `APPLICATION_EMAIL_REPLY_TO` | Valid sender domain (quote `APPLICATION_EMAIL_FROM` if it contains spaces or `<`). |
+| `APPLICATION_EMAIL_SIGN_OFF` | Optional. Closing line in the “application received” email (e.g. `Acme hiring team`). Defaults to `PUBLIC_COMPANY_NAME` if unset. **Baked in at `web` image build** like other `import.meta.env` values. |
 | `MAX_CV_SIZE_BYTES` | Optional; defaults in app if unset. |
 
-**Docker `web` image build:** `PUBLIC_SITE_URL`, `PUBLIC_COMPANY_NAME`, `POCKETBASE_URL` (compose pins this to `http://pocketbase:8090`), `POCKETBASE_SUBMISSION_SERVICE_*`, `FORM_SIGNING_SECRET`, `RESEND_API_KEY`, `APPLICATION_EMAIL_*`, and `MAX_CV_SIZE_BYTES` are passed as **build args** so Astro/Vite can inline them for SSR. Change any of these → **rebuild** the `web` image (`docker compose ... build --no-cache web`).
+**Docker `web` image build:** `PUBLIC_SITE_URL`, `PUBLIC_COMPANY_NAME`, `POCKETBASE_URL` (compose pins this to `http://pocketbase:8090`), `POCKETBASE_SUBMISSION_SERVICE_*`, `FORM_SIGNING_SECRET`, `RESEND_API_KEY`, `APPLICATION_EMAIL_FROM`, `APPLICATION_EMAIL_REPLY_TO`, optional `APPLICATION_EMAIL_SIGN_OFF`, and `MAX_CV_SIZE_BYTES` are passed as **build args** so Astro/Vite can inline them for SSR. Change any of these → **rebuild** the `web` image (`docker compose ... build --no-cache web`).
 
 Set **Caddy** host (same hostname as in DNS for the careers site):
 

@@ -1,5 +1,8 @@
 import { Resend } from "resend";
 
+import { applicationReceivedEmailPlainText } from "./application-received-copy";
+import { getApplicationEmailSignOff } from "./site";
+
 function getRequiredEnv(name: keyof ImportMetaEnv): string {
   const value = import.meta.env[name];
 
@@ -24,17 +27,11 @@ export async function sendApplicationReceivedEmail(input: ApplicationEmailInput)
     replyTo: getRequiredEnv("APPLICATION_EMAIL_REPLY_TO"),
     to: input.to,
     subject: "Application received",
-    text: `Hi ${input.fullName},
-
-Thank you for applying for the ${input.jobTitle} role.
-
-This email confirms that we received your application.
-
-Because we are a small team and may receive a large number of applications, we may not be able to reply personally to every candidate. If your background looks like a strong match, we will contact you with next steps.
-
-Thank you again for your interest.
-
-Noam`,
+    text: applicationReceivedEmailPlainText({
+      candidateName: input.fullName,
+      jobTitle: input.jobTitle,
+      signOffFrom: getApplicationEmailSignOff(),
+    }),
   });
 
   if (response.error) {

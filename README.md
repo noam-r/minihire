@@ -185,6 +185,8 @@ From the repository root, with `.env` containing production values and `SITE_HOS
 docker compose -f docker/docker-compose.prod.yml --env-file .env up -d --build
 ```
 
+After code or `.env` changes, you can rebuild and restart the same stack with **[`scripts/docker-reload.sh`](scripts/docker-reload.sh)** (from repo root: `./scripts/docker-reload.sh` or `./scripts/docker-reload.sh --no-cache` for a clean web build).
+
 Legacy v1 CLI:
 
 ```bash
