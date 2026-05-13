@@ -1,0 +1,23 @@
+FROM node:20-bookworm-slim
+
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+
+RUN corepack enable
+
+WORKDIR /app
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/web/package.json ./apps/web/package.json
+
+RUN pnpm install --frozen-lockfile
+
+COPY apps/web ./apps/web
+
+RUN pnpm --filter web build
+
+WORKDIR /app/apps/web
+
+EXPOSE 4321
+
+CMD ["node", "dist/server/entry.mjs"]

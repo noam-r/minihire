@@ -1,0 +1,11 @@
+version: "3.8"
+
+# Optional: map Caddy to high ports for local smoke tests (avoids binding host :80).
+# docker compose -f docker/docker-compose.prod.yml -f docker/docker-compose.smoketest.yml --env-file .env up -d --build
+# Then: SITE_HOST=127.0.0.1 curl -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:18080/
+
+services:
+  caddy:
+    ports:
+      - "18080:80"
+      - "18443:443"

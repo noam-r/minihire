@@ -1,0 +1,6 @@
+# Site address comes from SITE_HOST (e.g. careers.example.com).
+# For local smoke tests use SITE_HOST=localhost (HTTP on :80).
+{$SITE_HOST} {
+	encode zstd gzip
+	reverse_proxy web:4321
+}

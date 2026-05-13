@@ -1,0 +1,58 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { getPageTitle } from "../lib/site";
+
+const privacyEmail = import.meta.env.APPLICATION_EMAIL_REPLY_TO || "privacy@example.com";
+---
+
+<BaseLayout title={getPageTitle("Privacy")} description="Privacy information for applicant data.">
+  <article class="mx-auto max-w-3xl space-y-8">
+    <header class="space-y-3">
+      <p class="text-sm font-semibold uppercase tracking-[0.2em] text-sky-700">Privacy</p>
+      <h1 class="text-4xl font-semibold tracking-tight text-slate-900">Applicant privacy notice</h1>
+      <p class="text-base leading-7 text-slate-600">
+        We collect applicant information only for evaluating job applications. We do not sell
+        candidate data or share it with advertisers.
+      </p>
+    </header>
+
+    <section class="space-y-3 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <h2 class="text-xl font-semibold text-slate-900">What we collect</h2>
+      <ul class="list-disc space-y-2 pl-5 text-sm leading-6 text-slate-700">
+        <li>Name and contact details.</li>
+        <li>Application answers and public profile links you provide.</li>
+        <li>Your uploaded CV.</li>
+        <li>Basic submission metadata used to protect the application form.</li>
+      </ul>
+    </section>
+
+    <section class="space-y-3 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <h2 class="text-xl font-semibold text-slate-900">How we use it</h2>
+      <ul class="list-disc space-y-2 pl-5 text-sm leading-6 text-slate-700">
+        <li>To evaluate your application for the role you applied to.</li>
+        <li>To contact you about next steps if your background appears to be a strong match.</li>
+        <li>To keep basic operational logs such as confirmation email delivery attempts.</li>
+      </ul>
+    </section>
+
+    <section class="space-y-3 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <h2 class="text-xl font-semibold text-slate-900">Retention and deletion</h2>
+      <p class="text-sm leading-6 text-slate-700">
+        Rejected and withdrawn applications are retained for up to 12 months after last update.
+        Other non-hired applications with no activity for 12 months are treated as inactive and
+        should be deleted.
+      </p>
+      <p class="text-sm leading-6 text-slate-700">
+        To request deletion, contact <a class="font-medium text-sky-700" href={`mailto:${privacyEmail}`}>{privacyEmail}</a>.
+      </p>
+    </section>
+
+    <section class="space-y-3 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <h2 class="text-xl font-semibold text-slate-900">Storage and security</h2>
+      <p class="text-sm leading-6 text-slate-700">
+        Candidate data and CV files are stored in the application backend and accessed only through
+        authenticated admin workflows.
+      </p>
+    </section>
+  </article>
+</BaseLayout>

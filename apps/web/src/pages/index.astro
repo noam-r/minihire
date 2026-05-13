@@ -1,0 +1,61 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { getCompanyName, getPageTitle } from "../lib/site";
+
+const companyName = getCompanyName();
+const eyebrowLabel = companyName === "Careers" ? "Open roles" : companyName;
+---
+
+<BaseLayout
+  title={getPageTitle("Home")}
+  description="minihire — publish job openings and receive applications."
+>
+  <section class="mx-auto max-w-3xl space-y-8">
+    <div class="space-y-4">
+      <p class="text-sm font-semibold uppercase tracking-[0.2em] text-sky-700">{eyebrowLabel}</p>
+      <h1 class="text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl">
+        A simple hiring site for a small team.
+      </h1>
+      <p class="max-w-2xl text-lg leading-8 text-slate-600">
+        We publish active roles, accept applications directly, and review candidates internally in
+        PocketBase. Candidates do not need an account to apply.
+      </p>
+    </div>
+
+    <div class="flex flex-wrap gap-4">
+      <a
+        class="btn-primary btn-md"
+        href="/jobs"
+      >
+        View open jobs
+      </a>
+      <a
+        class="btn-secondary btn-md"
+        href="/privacy"
+      >
+        Read privacy notice
+      </a>
+    </div>
+
+    <div class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:grid-cols-3">
+      <div class="space-y-2">
+        <h2 class="text-base font-semibold text-slate-900">Small-team process</h2>
+        <p class="text-sm leading-6 text-slate-600">
+          Roles are listed only while they are open, and applications are reviewed by a small team.
+        </p>
+      </div>
+      <div class="space-y-2">
+        <h2 class="text-base font-semibold text-slate-900">Direct applications</h2>
+        <p class="text-sm leading-6 text-slate-600">
+          Candidates submit their details, answer a few questions, and upload a PDF or Markdown CV.
+        </p>
+      </div>
+      <div class="space-y-2">
+        <h2 class="text-base font-semibold text-slate-900">Private review</h2>
+        <p class="text-sm leading-6 text-slate-600">
+          Internal review, status updates, notes, and email logs live in the PocketBase admin UI.
+        </p>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

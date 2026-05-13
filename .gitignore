@@ -1,0 +1,26 @@
+node_modules
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db
+
+*.log
+.pnpm-debug.log*
+
+apps/web/dist
+apps/web/.astro
+apps/web/node_modules
+
+pocketbase/pocketbase
+pocketbase/pb_data
+
+backups
+
+# Editor / OS
+.idea/
+*.swp
+*.swo
+
+# Test / coverage (if added later)
+coverage/

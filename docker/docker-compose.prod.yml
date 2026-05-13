@@ -1,0 +1,85 @@
+version: "3.8"
+
+# Production stack: TLS on 80/443 via Caddy; web and PocketBase are not published on the host
+# Run from repo root:
+#   docker compose -f docker/docker-compose.prod.yml --env-file .env up -d --build
+#
+# Required for public HTTPS: SITE_HOST must be the public DNS name (e.g. careers.example.com)
+# pointing at this host, and ports 80/443 reachable from the internet for ACME.
+
+networks:
+  app:
+    driver: bridge
+
+services:
+  pocketbase:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.pocketbase
+    container_name: minihire-pocketbase
+    env_file:
+      - ../.env
+    # Loopback only: use with `ssh -L 8090:127.0.0.1:8090` for admin UI; do not open 8090 in the security group.
+    ports:
+      - "127.0.0.1:8090:8090"
+    volumes:
+      - pocketbase_data:/pb_data
+    restart: unless-stopped
+    networks:
+      - app
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  web:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.web
+    container_name: minihire-web
+    depends_on:
+      - pocketbase
+    env_file:
+      - ../.env
+    environment:
+      # Always use the Docker service name (do not use host loopback from .env).
+      POCKETBASE_URL: http://pocketbase:8090
+      HOST: 0.0.0.0
+      PORT: 4321
+    restart: unless-stopped
+    networks:
+      - app
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: minihire-caddy
+    depends_on:
+      - web
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SITE_HOST: ${SITE_HOST:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+    networks:
+      - app
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  pocketbase_data:
+  caddy_data:
+  caddy_config:

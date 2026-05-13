@@ -1,0 +1,27 @@
+FROM alpine:3.22
+
+ARG POCKETBASE_VERSION=0.37.5
+
+RUN apk add --no-cache ca-certificates curl unzip && \
+  arch="$(apk --print-arch)" && \
+  case "$arch" in \
+    x86_64) pocketbase_arch="amd64" ;; \
+    aarch64) pocketbase_arch="arm64" ;; \
+    *) echo "Unsupported architecture: $arch" && exit 1 ;; \
+  esac && \
+  curl -fsSL -o /tmp/pocketbase.zip "https://github.com/pocketbase/pocketbase/releases/download/v${POCKETBASE_VERSION}/pocketbase_${POCKETBASE_VERSION}_linux_${pocketbase_arch}.zip" && \
+  unzip /tmp/pocketbase.zip -d /pocketbase && \
+  rm /tmp/pocketbase.zip && \
+  chmod +x /pocketbase/pocketbase
+
+WORKDIR /pocketbase
+
+COPY pocketbase/pb_migrations ./pb_migrations
+COPY pocketbase/pb_hooks ./pb_hooks
+COPY pocketbase/README.md ./README.md
+
+VOLUME ["/pb_data"]
+
+EXPOSE 8090
+
+CMD ["./pocketbase", "serve", "--http=0.0.0.0:8090", "--dir=/pb_data", "--migrationsDir=/pocketbase/pb_migrations"]

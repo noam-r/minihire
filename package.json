@@ -1,0 +1,18 @@
+{
+  "name": "minihire",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.9.0",
+  "scripts": {
+    "dev": "concurrently \"pnpm dev:pocketbase\" \"pnpm dev:web\"",
+    "dev:web": "pnpm --filter web dev",
+    "dev:pocketbase": "bash ./scripts/run-pocketbase.sh",
+    "build": "pnpm --filter web build",
+    "preview": "pnpm --filter web preview",
+    "lint": "pnpm --filter web lint",
+    "typecheck": "pnpm --filter web typecheck"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

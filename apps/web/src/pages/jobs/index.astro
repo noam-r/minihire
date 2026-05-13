@@ -1,0 +1,38 @@
+---
+import JobCard from "../../components/JobCard.astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { getPublishedJobs } from "../../lib/jobs";
+import { getPageTitle } from "../../lib/site";
+
+const jobs = await getPublishedJobs();
+---
+
+<BaseLayout title={getPageTitle("Open Jobs")} description="Open roles currently accepting applications.">
+  <section class="mx-auto max-w-4xl space-y-8">
+    <div class="space-y-3">
+      <p class="text-sm font-semibold uppercase tracking-[0.2em] text-sky-700">Open roles</p>
+      <h1 class="text-4xl font-semibold tracking-tight text-slate-900">Jobs</h1>
+      <p class="max-w-2xl text-base leading-7 text-slate-600">
+        These are the currently published roles. Select a job to read the full description and
+        apply.
+      </p>
+    </div>
+
+    {
+      jobs.length > 0 ? (
+        <div class="space-y-4">
+          {jobs.map((job) => (
+            <JobCard job={job} />
+          ))}
+        </div>
+      ) : (
+        <div class="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center shadow-sm">
+          <h2 class="text-xl font-semibold text-slate-900">No open jobs right now</h2>
+          <p class="mt-2 text-sm leading-6 text-slate-600">
+            There are currently no published roles. Please check back later.
+          </p>
+        </div>
+      )
+    }
+  </section>
+</BaseLayout>
