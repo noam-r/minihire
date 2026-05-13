@@ -32,3 +32,14 @@ http://127.0.0.1:8090/_/
 ```
 
 Create the first superuser there. The Astro app authenticates to PocketBase as the **`submission_service`** account (see root `.env.example`); it does **not** use the superuser.
+
+### Docker / production data directory
+
+When PocketBase runs with **`--dir=/pb_data`** (as in the production container), every CLI command that mutates data must use the same **`--dir`**, for example:
+
+```bash
+docker compose -f docker/docker-compose.prod.yml --env-file .env exec pocketbase \
+  ./pocketbase superuser upsert admin@example.com 'your-strong-password' --dir=/pb_data
+```
+
+Without `--dir=/pb_data`, the CLI may update a different on-disk database than the running server.

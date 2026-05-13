@@ -80,21 +80,32 @@ Edit `.env` on the server (use SSM Parameter Store or Secrets Manager in real op
 
 | Variable | Production value |
 |----------|-------------------|
-| `PUBLIC_SITE_URL` | `https://careers.example.com` |
+| `PUBLIC_SITE_URL` | `https://careers.example.com` — must match the public site. **Docker:** passed as a **build-arg** when building the `web` image so Astro accepts form POSTs behind Caddy (`security.allowedDomains`). Rebuild after changing it. |
 | `PUBLIC_COMPANY_NAME` | Your company display name |
 | `POCKETBASE_URL` | Ignored for SSR in Docker prod (compose sets `http://pocketbase:8090`). Keep `http://127.0.0.1:8090` in `.env` if you also use `pnpm dev` on a workstation. |
 | `POCKETBASE_SUBMISSION_SERVICE_EMAIL` / `POCKETBASE_SUBMISSION_SERVICE_PASSWORD` | Dedicated PocketBase auth for the web app (≥10 chars). Same values must be available to the **pocketbase** container on first boot if you rely on migration auto-seeding. |
 | `POCKETBASE_ADMIN_EMAIL` / `POCKETBASE_ADMIN_PASSWORD` | Superuser for the PocketBase `/_/` UI only (optional in `.env` for your notes; **not** used by Astro). |
 | `RESEND_API_KEY` | Production key |
 | `FORM_SIGNING_SECRET` | Long random string |
-| `APPLICATION_EMAIL_FROM` / `APPLICATION_EMAIL_REPLY_TO` | Valid sender domain |
+| `APPLICATION_EMAIL_FROM` / `APPLICATION_EMAIL_REPLY_TO` | Valid sender domain (quote `APPLICATION_EMAIL_FROM` if it contains spaces or `<`). |
+| `MAX_CV_SIZE_BYTES` | Optional; defaults in app if unset. |
 
-Set **Caddy** host (same hostname as in DNS):
+**Docker `web` image build:** `PUBLIC_SITE_URL`, `PUBLIC_COMPANY_NAME`, `POCKETBASE_URL` (compose pins this to `http://pocketbase:8090`), `POCKETBASE_SUBMISSION_SERVICE_*`, `FORM_SIGNING_SECRET`, `RESEND_API_KEY`, `APPLICATION_EMAIL_*`, and `MAX_CV_SIZE_BYTES` are passed as **build args** so Astro/Vite can inline them for SSR. Change any of these → **rebuild** the `web` image (`docker compose ... build --no-cache web`).
+
+Set **Caddy** host (same hostname as in DNS for the careers site):
 
 ```bash
 # append to .env or export before compose
 SITE_HOST=careers.example.com
 ```
+
+**Optional — PocketBase Admin over HTTPS:** bind a dedicated hostname (e.g. `admin-careers.example.com`) so Caddy can reverse-proxy to PocketBase on port 443 without relying on an SSH tunnel for day-to-day use. Add to `.env`:
+
+```bash
+POCKETBASE_ADMIN_HOST=admin-careers.example.com
+```
+
+Create a **CNAME** in DNS (e.g. `admin-careers` → `careers.example.com` proxied through Cloudflare). Leave `POCKETBASE_ADMIN_HOST` unset to keep only the careers site in Caddy (PocketBase admin then via `127.0.0.1:8090` SSH tunnel if you publish that port).
 
 ## 5. Start the stack
 
@@ -113,14 +124,24 @@ docker-compose -f docker/docker-compose.prod.yml --env-file .env up -d --build
 ```
 
 - Public site: `https://$SITE_HOST`
-- PocketBase: not on the public internet; use SSH tunnel for `/_/`.
+- PocketBase Admin: if `POCKETBASE_ADMIN_HOST` is set, open `https://$POCKETBASE_ADMIN_HOST/_/`. Otherwise use an **SSH tunnel** to `127.0.0.1:8090` (see compose `pocketbase` ports).
 
 ## 6. First-time PocketBase
 
-1. SSH tunnel to `8090` as above.
-2. Open `http://127.0.0.1:8090/_/`, create the superuser if prompted (admin UI only).
-3. Ensure `.env` defines `POCKETBASE_SUBMISSION_SERVICE_EMAIL` and `POCKETBASE_SUBMISSION_SERVICE_PASSWORD` (long random password). The **pocketbase** service uses the same `env_file` as `web` so the migration can create the `submission_service` account on first start when the password meets the length requirement.
-4. If the service user was not created automatically, add it under **Collections → submission_service** with the same email and password as in `.env`, mark it verified, then restart the stack.
+1. If you use **`POCKETBASE_ADMIN_HOST`**, open `https://$POCKETBASE_ADMIN_HOST/_/` and create the superuser when prompted. Otherwise SSH-tunnel to `8090` and open `http://127.0.0.1:8090/_/`.
+2. Ensure `.env` defines `POCKETBASE_SUBMISSION_SERVICE_EMAIL` and `POCKETBASE_SUBMISSION_SERVICE_PASSWORD` (long random password). The **pocketbase** service uses the same `env_file` as `web` so the migration can create the `submission_service` account on first start when the password meets the length requirement.
+3. If the service user was not created automatically, add it under **Collections → submission_service** with the same email and password as in `.env`, mark it verified, then restart the stack.
+
+### Reset or create the superuser (Docker)
+
+The running server uses data under **`/pb_data`**. Any `superuser` CLI must use the same directory or changes apply to the wrong database:
+
+```bash
+cd /opt/minihire/repo
+
+docker compose -f docker/docker-compose.prod.yml --env-file .env exec pocketbase \
+  ./pocketbase superuser upsert admin@example.com 'REPLACE_WITH_A_STRONG_PASSWORD' --dir=/pb_data
+```
 
 ## 7. Backups
 

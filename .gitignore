@@ -24,3 +24,4 @@ backups
 
 # Test / coverage (if added later)
 coverage/
+tmp/

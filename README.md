@@ -158,6 +158,7 @@ Files:
 - [`docker/docker-compose.yml`](docker/docker-compose.yml) — **local / dev**: publishes `4321` (web) and `8090` (PocketBase)
 - [`docker/docker-compose.prod.yml`](docker/docker-compose.prod.yml) — **production**: Caddy on `80`/`443`, web and PocketBase **not** on public ports; PocketBase also on `127.0.0.1:8090` for SSH tunnel admin access
 - [`docker/Caddyfile`](docker/Caddyfile) — reverse proxy + automatic HTTPS when `SITE_HOST` is a real DNS name
+- [`docker/caddy-entrypoint.sh`](docker/caddy-entrypoint.sh) — merges an optional PocketBase Admin site when `POCKETBASE_ADMIN_HOST` is set
 - [`docker/docker-compose.smoketest.yml`](docker/docker-compose.smoketest.yml) — optional high ports (`18080`/`18443`) for local smoke tests
 
 ### Local containers (dev-style ports)
@@ -178,7 +179,7 @@ docker-compose up --build
 
 ### Production stack (Caddy + TLS)
 
-From the repository root, with `.env` containing production values and `SITE_HOST` set to your public hostname:
+From the repository root, with `.env` containing production values and `SITE_HOST` set to your public hostname. **`PUBLIC_SITE_URL` must be the public `https://…` origin** before you run `docker compose ... --build`, so the Astro image records the correct `security.allowedDomains` (otherwise application forms return 403 behind the proxy).
 
 ```bash
 docker compose -f docker/docker-compose.prod.yml --env-file .env up -d --build
