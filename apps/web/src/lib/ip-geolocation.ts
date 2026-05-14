@@ -57,8 +57,15 @@ type IpWhoIsPayload = {
 };
 
 /**
- * Best-effort city/region/country label from the submission IP (HTTPS, no API key).
- * Returns null when lookup is skipped, fails, or the service has no location.
+ * Best-effort city/region/country label from the submission IP.
+ *
+ * Implementation: **HTTPS GET** to `https://ipwho.is/<ip>` (no API key). The JSON includes
+ * `city`, `region` (e.g. state), and `country`; we join whichever are non-empty (max 200 chars).
+ *
+ * Returns **null** when the IP is private/unknown (lookup skipped), the HTTP call fails, times out
+ * (2.5s), `success` is false, or no location fields are present. **CDN edge IPs** (e.g. wrong
+ * client IP) may still return a datacenter/POP city — use `getClientIpFromRequest` so the stored
+ * IP is the real visitor when behind Cloudflare.
  */
 export async function resolveIpLocationLabel(ip: string): Promise<string | null> {
   const normalized = normalizeSubmissionIp(ip);

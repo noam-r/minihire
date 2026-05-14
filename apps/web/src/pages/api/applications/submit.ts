@@ -7,6 +7,7 @@ import {
   findApplicationByDuplicateKey,
   hasSuccessfulConfirmationEmail,
 } from "../../../lib/applications";
+import { getClientIpFromRequest } from "../../../lib/client-ip";
 import { normalizeSubmissionIp, resolveIpLocationLabel } from "../../../lib/ip-geolocation";
 import { getPublicPocketBase, getSubmissionServicePocketBase } from "../../../lib/pocketbase";
 import { isRateLimited } from "../../../lib/rate-limit";
@@ -31,16 +32,6 @@ function json(data: unknown, status = 200): Response {
   });
 }
 
-function getClientIp(request: Request, clientAddress: string | undefined): string {
-  const forwardedFor = request.headers.get("x-forwarded-for");
-
-  if (forwardedFor) {
-    return forwardedFor.split(",")[0]?.trim() || "unknown";
-  }
-
-  return clientAddress || "unknown";
-}
-
 async function findPublishedJobBySlug(slug: string): Promise<JobRecord | null> {
   const pb = getPublicPocketBase();
 
@@ -62,7 +53,7 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
 
   try {
     const formData = await request.formData();
-    const ipAddress = getClientIp(request, clientAddress);
+    const ipAddress = getClientIpFromRequest(request, clientAddress);
 
     // Count every POST toward the limit before spam short-circuit (otherwise bad signatures bypass rate limiting).
     if (isRateLimited(ipAddress)) {

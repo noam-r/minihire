@@ -255,7 +255,9 @@ const linkedinUrl = optionalApplicantUrl(record.linkedin_url);
         <div class="border-t border-slate-100 bg-slate-50/60 px-5 py-4">
           <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-500">Submission context</h3>
           <p class="mt-1 text-xs text-slate-500">
-            Captured automatically (not on the public form). IP location is approximate when lookup succeeds.
+            Captured automatically (not on the public form). The IP prefers the visitor address when
+            Cloudflare or another proxy sends standard headers (see deploy docs). Location is filled by
+            a third-party geo lookup from that IP when it succeeds — approximate, not exact.
           </p>
           <dl class="mt-3 divide-y divide-slate-200/80 text-sm">
             <div class="flex flex-col gap-1 py-3 first:pt-0 sm:flex-row sm:justify-between sm:gap-6">

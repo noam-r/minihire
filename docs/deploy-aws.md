@@ -11,6 +11,12 @@ PocketBase uses **SQLite + local files** under `pb_data`. Run **one** long-lived
 - **Astro** calls PocketBase at `http://pocketbase:8090` inside the compose network (`POCKETBASE_URL` in the web container).
 - **Candidates** see only `PUBLIC_SITE_URL` (must be the public `https://…` origin).
 
+## Cloudflare (or another CDN) in front of Caddy
+
+If **Cloudflare** terminates TLS and proxies to your instance, the TCP connection to Caddy/Astro comes from a **Cloudflare edge IP** (e.g. `172.64.0.0/13`), not the candidate. The app now prefers the **`CF-Connecting-IP`** header (then `True-Client-IP`, `Fly-Client-IP`, `X-Real-IP`, then `X-Forwarded-For`) when resolving the client IP for applications and rate limiting.
+
+Ensure your origin is reached **only** via the CDN so clients cannot spoof `CF-Connecting-IP`. Caddy’s default `reverse_proxy` forwards incoming request headers to the `web` container; you normally do **not** need extra config unless you stripped headers.
+
 ## 1. EC2 instance
 
 - **AMI:** Amazon Linux 2023 or Ubuntu 22.04 LTS.
