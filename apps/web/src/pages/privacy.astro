@@ -1,8 +1,9 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
+import { runtimeEnv } from "../lib/server-env";
 import { getPageTitle } from "../lib/site";
 
-const privacyEmail = import.meta.env.APPLICATION_EMAIL_REPLY_TO || "privacy@example.com";
+const privacyEmail = runtimeEnv("APPLICATION_EMAIL_REPLY_TO") || "privacy@example.com";
 ---
 
 <BaseLayout title={getPageTitle("Privacy")} description="Privacy information for applicant data.">

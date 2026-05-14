@@ -1,17 +1,8 @@
 import { Resend } from "resend";
 
 import { applicationReceivedEmailPlainText } from "./application-received-copy";
+import { requireRuntimeEnv } from "./server-env";
 import { getApplicationEmailSignOff } from "./site";
-
-function getRequiredEnv(name: keyof ImportMetaEnv): string {
-  const value = import.meta.env[name];
-
-  if (!value) {
-    throw new Error(`Missing required environment variable: ${name}`);
-  }
-
-  return value;
-}
 
 export interface ApplicationEmailInput {
   to: string;
@@ -20,11 +11,11 @@ export interface ApplicationEmailInput {
 }
 
 export async function sendApplicationReceivedEmail(input: ApplicationEmailInput): Promise<string | null> {
-  const resend = new Resend(getRequiredEnv("RESEND_API_KEY"));
+  const resend = new Resend(requireRuntimeEnv("RESEND_API_KEY"));
 
   const response = await resend.emails.send({
-    from: getRequiredEnv("APPLICATION_EMAIL_FROM"),
-    replyTo: getRequiredEnv("APPLICATION_EMAIL_REPLY_TO"),
+    from: requireRuntimeEnv("APPLICATION_EMAIL_FROM"),
+    replyTo: requireRuntimeEnv("APPLICATION_EMAIL_REPLY_TO"),
     to: input.to,
     subject: "Application received",
     text: applicationReceivedEmailPlainText({

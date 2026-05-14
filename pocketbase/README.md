@@ -5,7 +5,7 @@ This directory contains the PocketBase-specific assets for minihire.
 ## Contents
 
 - `pb_migrations/`: schema migrations for collections, fields, rules, and indexes
-- `pb_hooks/`: optional future PocketBase hooks
+- `pb_hooks/`: PocketBase JS hooks (e.g. portal update guards)
 
 ## Local Usage
 
@@ -32,6 +32,14 @@ http://127.0.0.1:8090/_/
 ```
 
 Create the first superuser there. The Astro app authenticates to PocketBase as the **`submission_service`** account (see root `.env.example`); it does **not** use the superuser.
+
+### Recruiter portal (`users` auth)
+
+PocketBase ships a default **`users`** auth collection. Minihire extends it (see `pb_migrations/1747066000_recruiter_portal_users_rules.js`) with `role` (`admin` \| `recruiter`) and `active` for recruiter portal login (**Model A** in [`tmp/minihire-ai-docs-with-recruiter-portal/minihire-ai-docs/recruiter-portal-locked-decisions.md`](../tmp/minihire-ai-docs-with-recruiter-portal/minihire-ai-docs/recruiter-portal-locked-decisions.md)). Create recruiter accounts in the Admin UI under **Collections → users** (or `superuser upsert` is only for `_superusers`, not `users` — use Admin UI **Auth → users** or the users API after first superuser exists).
+
+Hooks under [`pb_hooks/`](./pb_hooks/) enforce that portal users cannot overwrite arbitrary `applications` fields (status-only updates).
+
+Migration `1747066100_jobs_admin_portal_update` sets **`jobs.updateRule`** so PocketBase **`users`** with **`role = admin`** (and `active`) may update job records from the Astro recruiter portal; **`recruiter`** role and **`submission_service`** do not receive update access via rules.
 
 ### Docker / production data directory
 

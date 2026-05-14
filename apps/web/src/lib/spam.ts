@@ -1,18 +1,14 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
+import { requireRuntimeEnv } from "./server-env";
+
 export const HONEYPOT_FIELD_NAME = "company_website";
 export const FORM_STARTED_AT_FIELD = "form_started_at";
 export const FORM_SIGNATURE_FIELD = "form_signature";
 const MIN_FORM_COMPLETION_MS = 4_000;
 
 function getSigningSecret(): string {
-  const secret = import.meta.env.FORM_SIGNING_SECRET;
-
-  if (!secret) {
-    throw new Error("Missing required environment variable: FORM_SIGNING_SECRET");
-  }
-
-  return secret;
+  return requireRuntimeEnv("FORM_SIGNING_SECRET");
 }
 
 function sign(jobSlug: string, startedAt: string): string {

@@ -61,8 +61,15 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
 
   try {
     const formData = await request.formData();
-    const jobSlug = String(formData.get("job_slug") ?? "").trim();
     const ipAddress = getClientIp(request, clientAddress);
+
+    // Count every POST toward the limit before spam short-circuit (otherwise bad signatures bypass rate limiting).
+    if (isRateLimited(ipAddress)) {
+      console.warn(`Application submission rate limited for IP ${ipAddress}`);
+      return json({ ok: true });
+    }
+
+    const jobSlug = String(formData.get("job_slug") ?? "").trim();
 
     if (!jobSlug) {
       console.warn("Application submission validation failure: missing job_slug");
@@ -78,11 +85,6 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
 
     if (isSuspiciousSubmission(jobSlug, formData)) {
       console.info(`Application submission treated as spam for job ${jobSlug}`);
-      return json({ ok: true });
-    }
-
-    if (isRateLimited(ipAddress)) {
-      console.warn(`Application submission rate limited for IP ${ipAddress}`);
       return json({ ok: true });
     }
 

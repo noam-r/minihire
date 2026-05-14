@@ -1,0 +1,81 @@
+---
+import "../styles/global.css";
+
+import { ensureSessionCsrfCookie } from "../lib/recruiter-auth/cookies";
+import { getCompanyName } from "../lib/site";
+
+interface Props {
+  title: string;
+}
+
+const { title } = Astro.props;
+const companyName = getCompanyName();
+
+const recruiter = Astro.locals.recruiter!;
+const csrf = ensureSessionCsrfCookie(Astro.cookies);
+const { user } = recruiter;
+
+const signedIn = Astro.url.searchParams.get("signed_in") === "1";
+const dismissParams = new URLSearchParams(Astro.url.search);
+dismissParams.delete("signed_in");
+const dismissHref = dismissParams.toString() ? `${Astro.url.pathname}?${dismissParams}` : Astro.url.pathname;
+
+const path = Astro.url.pathname.replace(/\/$/, "") || "/";
+function navClass(href: string): string {
+  const normalized = href.replace(/\/$/, "") || "/";
+  const active =
+    normalized === "/recruiter"
+      ? path === "/recruiter"
+      : path === normalized || path.startsWith(`${normalized}/`);
+  return active
+    ? "rounded-md bg-teal-50 px-3 py-2 text-sm font-semibold text-teal-900 ring-1 ring-teal-100"
+    : "rounded-md px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900";
+}
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="generator" content={Astro.generator} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>{title}</title>
+  </head>
+  <body class="bg-slate-50 text-slate-900">
+    <div class="min-h-screen">
+      <header class="border-b border-slate-200 bg-white/90 backdrop-blur">
+        <div class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-4">
+          <div class="flex flex-col leading-tight">
+            <span class="text-sm font-semibold tracking-tight text-slate-900">{companyName}</span>
+            <span class="text-xs text-slate-500">Recruiter · {user.email}</span>
+            <span class="text-xs text-slate-400 capitalize">{user.role}</span>
+          </div>
+          <nav class="flex flex-wrap items-center gap-1 text-sm" aria-label="Recruiter portal">
+            <a class={navClass("/recruiter")} href="/recruiter">Dashboard</a>
+            <a class={navClass("/recruiter/jobs")} href="/recruiter/jobs">Jobs</a>
+            <a class={navClass("/recruiter/applications")} href="/recruiter/applications">Applications</a>
+            <form method="post" action="/recruiter/actions/logout" class="ml-2 inline">
+              <input type="hidden" name="csrf" value={csrf} />
+              <button type="submit" class="btn-secondary btn-sm">Sign out</button>
+            </form>
+          </nav>
+        </div>
+      </header>
+
+      <main class="mx-auto max-w-6xl px-6 py-10">
+        {
+          signedIn && (
+            <p class="mb-6 rounded-md border border-teal-200 bg-teal-50 px-3 py-2 text-sm text-teal-900">
+              Signed in successfully.{" "}
+              <a class="font-medium text-teal-900 underline hover:text-teal-950" href={dismissHref}>
+                Dismiss
+              </a>
+            </p>
+          )
+        }
+        <slot />
+      </main>
+    </div>
+  </body>
+</html>

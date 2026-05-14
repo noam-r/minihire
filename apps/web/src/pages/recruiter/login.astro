@@ -1,0 +1,105 @@
+---
+import "../../styles/global.css";
+import { randomUUID } from "node:crypto";
+
+import { setLoginCsrfCookie } from "../../lib/recruiter-auth/cookies";
+import { sanitizeRecruiterNext } from "../../lib/recruiter-auth/redirect-next";
+import { getRecruiterPocketBase } from "../../lib/recruiter-auth/session";
+import { getCompanyName } from "../../lib/site";
+
+const companyName = getCompanyName();
+
+const session = await getRecruiterPocketBase(Astro);
+if (session) {
+  return Astro.redirect(sanitizeRecruiterNext(Astro.url.searchParams.get("next") ?? undefined));
+}
+
+const csrf = randomUUID();
+setLoginCsrfCookie(Astro.cookies, csrf);
+
+const nextRaw = Astro.url.searchParams.get("next");
+const nextHidden =
+  nextRaw !== null && nextRaw !== "" ? sanitizeRecruiterNext(nextRaw) : null;
+const includeNextHidden = Boolean(nextHidden && nextHidden !== "/recruiter");
+
+const error = Astro.url.searchParams.get("error");
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="generator" content={Astro.generator} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Recruiter sign in | {companyName}</title>
+  </head>
+  <body class="bg-slate-50 text-slate-900">
+    <div class="flex min-h-screen items-center justify-center px-4 py-12">
+      <div class="w-full max-w-md rounded-lg border border-slate-200 bg-white p-8 shadow-sm">
+        <h1 class="text-xl font-semibold text-slate-900">Recruiter sign in</h1>
+        <p class="mt-1 text-sm text-slate-600">Use your company recruiter account.</p>
+
+        {
+          error === "invalid" && (
+            <p class="mt-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+              Email or password was not recognized.
+            </p>
+          )
+        }
+        {
+          error === "portal_profile" && (
+            <p class="mt-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+              Your account signed in to PocketBase, but this app rejected the session. In PocketBase Admin →
+              <strong class="font-semibold"> users</strong>, your record must have <strong class="font-semibold">role</strong> set
+              to <code class="rounded bg-rose-100 px-1">admin</code> or <code class="rounded bg-rose-100 px-1">recruiter</code> and{" "}
+              <strong class="font-semibold">active</strong> turned on.
+            </p>
+          )
+        }
+        {
+          error === "session" && (
+            <p class="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              Your session cookie was present but could not be refreshed (expired, revoked, or out of sync). Sign in again.
+            </p>
+          )
+        }
+        {
+          error === "csrf" && (
+            <p class="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              Security check failed. Please try again.
+            </p>
+          )
+        }
+
+        <form class="mt-6 space-y-4" method="post" action="/recruiter/actions/login">
+          <input type="hidden" name="csrf" value={csrf} />
+          {includeNextHidden && <input type="hidden" name="next" value={nextHidden!} />}
+          <div>
+            <label class="mb-1 block text-sm font-medium text-slate-700" for="email">Email</label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              autocomplete="username"
+              required
+              class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600"
+            />
+          </div>
+          <div>
+            <label class="mb-1 block text-sm font-medium text-slate-700" for="password">Password</label>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              autocomplete="current-password"
+              required
+              class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600"
+            />
+          </div>
+          <button type="submit" class="btn-primary btn-md w-full">Sign in</button>
+        </form>
+      </div>
+    </div>
+  </body>
+</html>

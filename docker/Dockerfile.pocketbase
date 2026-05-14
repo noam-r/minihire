@@ -2,7 +2,7 @@ FROM alpine:3.22
 
 ARG POCKETBASE_VERSION=0.37.5
 
-RUN apk add --no-cache ca-certificates curl unzip && \
+RUN apk add --no-cache ca-certificates curl unzip sqlite && \
   arch="$(apk --print-arch)" && \
   case "$arch" in \
     x86_64) pocketbase_arch="amd64" ;; \

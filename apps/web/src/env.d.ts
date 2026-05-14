@@ -18,3 +18,10 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+declare namespace App {
+  interface Locals {
+    /** Set by middleware for authenticated `/recruiter/*` routes (except login). */
+    recruiter?: import("./lib/recruiter-auth/session").RecruiterSession;
+  }
+}

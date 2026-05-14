@@ -88,10 +88,10 @@ Edit `.env` on the server (use SSM Parameter Store or Secrets Manager in real op
 | `RESEND_API_KEY` | Production key |
 | `FORM_SIGNING_SECRET` | Long random string |
 | `APPLICATION_EMAIL_FROM` / `APPLICATION_EMAIL_REPLY_TO` | Valid sender domain (quote `APPLICATION_EMAIL_FROM` if it contains spaces or `<`). |
-| `APPLICATION_EMAIL_SIGN_OFF` | Optional. Closing line in the “application received” email (e.g. `Acme hiring team`). Defaults to `PUBLIC_COMPANY_NAME` if unset. **Baked in at `web` image build** like other `import.meta.env` values. |
-| `MAX_CV_SIZE_BYTES` | Optional; defaults in app if unset. |
+| `APPLICATION_EMAIL_SIGN_OFF` | Optional. Closing line in the “application received” email (e.g. `Acme hiring team`). Defaults to `PUBLIC_COMPANY_NAME` if unset. Loaded at **container runtime** from `.env` (not image build). |
+| `MAX_CV_SIZE_BYTES` | Optional; defaults in app if unset. May be passed as a **build-arg** in Compose or set only at runtime. |
 
-**Docker `web` image build:** `PUBLIC_SITE_URL`, `PUBLIC_COMPANY_NAME`, `POCKETBASE_URL` (compose pins this to `http://pocketbase:8090`), `POCKETBASE_SUBMISSION_SERVICE_*`, `FORM_SIGNING_SECRET`, `RESEND_API_KEY`, `APPLICATION_EMAIL_FROM`, `APPLICATION_EMAIL_REPLY_TO`, optional `APPLICATION_EMAIL_SIGN_OFF`, and `MAX_CV_SIZE_BYTES` are passed as **build args** so Astro/Vite can inline them for SSR. Change any of these → **rebuild** the `web` image (`docker compose ... build --no-cache web`).
+**Docker `web` image build:** only **non-secret** build args (`PUBLIC_SITE_URL`, `PUBLIC_COMPANY_NAME`, optional `MAX_CV_SIZE_BYTES`) so Astro can inline `PUBLIC_*` and match `security.allowedDomains`. **`POCKETBASE_URL`**, **`POCKETBASE_SUBMISSION_SERVICE_*`**, **`FORM_SIGNING_SECRET`**, **`RESEND_API_KEY`**, and **email-related variables** stay in `.env` and are injected at **runtime** via Compose `env_file` / `environment` — read with `process.env` in Node and **not** baked into image layers. Change a secret → **restart** the `web` container; change `PUBLIC_SITE_URL` → **rebuild** the `web` image.
 
 Set **Caddy** host (same hostname as in DNS for the careers site):
 
@@ -146,7 +146,7 @@ docker compose -f docker/docker-compose.prod.yml --env-file .env exec pocketbase
 
 ## 7. Backups
 
-[`scripts/backup.sh`](../scripts/backup.sh) expects `sqlite3` and a **host path** to `pb_data`. With Docker **named volumes**, copy data out then run the script, or archive the volume directly.
+[`scripts/backup.sh`](../scripts/backup.sh) can back up from a **host path** (`POCKETBASE_DATA_DIR`) or from a **running PocketBase container** (`POCKETBASE_DOCKER_CONTAINER=minihire-pocketbase`). With Docker **named volumes** and no bind mount, use the container mode (rebuild the PocketBase image once so it includes `sqlite3`; see `docker/Dockerfile.pocketbase`). Alternatively archive `/pb_data` with `tar` via `docker compose exec` (Option A below).
 
 **Option A — archive named volume (simple):**
 

@@ -6,6 +6,7 @@ import {
   normalizeShortText,
   trimText,
 } from "./sanitize";
+import { runtimeEnv } from "./server-env";
 
 const MAX_FULL_NAME_LENGTH = 120;
 const MAX_EMAIL_LENGTH = 254;
@@ -150,7 +151,7 @@ export function validateApplicationFormData(
 }
 
 export function getMaxCvSizeBytes(): number {
-  const raw = import.meta.env.MAX_CV_SIZE_BYTES;
+  const raw = runtimeEnv("MAX_CV_SIZE_BYTES");
 
   if (!raw) {
     return 5 * 1024 * 1024;

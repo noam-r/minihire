@@ -34,7 +34,7 @@ Minimal hiring site for publishing job openings and receiving applications.
 - Node.js 20+ (see `apps/web/package.json` `engines`)
 - pnpm
 - `curl` and `unzip` for the local PocketBase bootstrap script
-- `sqlite3` for backups (host-based restores; optional for Docker volume backups)
+- `sqlite3` on the host when using **host-path** backups (`scripts/backup.sh` without `POCKETBASE_DOCKER_CONTAINER`); optional if you only use **Docker container** backups
 - Docker Engine 24+ and Docker Compose v2 (for container deployment)
 
 ## Environment
@@ -80,6 +80,8 @@ This starts:
 
 - Astro on `http://127.0.0.1:4321`
 - PocketBase on `http://127.0.0.1:8090`
+
+The recruiter portal is at **`http://127.0.0.1:4321/recruiter`** after you create a PocketBase `users` account with `role` and `active` (see **Recruiter portal** below).
 
 The `pnpm dev:pocketbase` script downloads PocketBase automatically on first run if the binary is not already present in `pocketbase/pocketbase`.
 
@@ -127,12 +129,22 @@ After creating the PocketBase superuser:
 
 Once published, the role should appear on `/jobs`.
 
+## Recruiter portal
+
+Hiring staff use the **recruiter portal** at **`/recruiter`** on the same origin as `PUBLIC_SITE_URL` (for example `http://127.0.0.1:4321/recruiter` in local dev). It authenticates against PocketBase’s default **`users`** auth collection after migration `1747066000_recruiter_portal_users_rules` adds **`role`** (`admin` or `recruiter`) and **`active`**.
+
+1. In PocketBase Admin, open the **`users`** auth collection.
+2. Create a record (or edit an existing test user): set **`role`**, turn **`active`** on, and set a password under the auth UI.
+3. Sign in at `/recruiter`.
+
+From the portal you can review applications (paginated list), open a candidate (status changes, internal notes, CV download through the app), and **admins** can edit jobs (title, slug, summary, description, status, optional published date) on each job’s recruiter page after migration `1747066100_jobs_admin_portal_update`. **`email_logs`** are not shown in the portal (v1). Recruiters without the **admin** role see jobs read-only in the portal; job **creation** and **deletion** remain in PocketBase Admin (superuser or future rules).
+
 ## PocketBase Notes
 
-- `jobs` is public read-only for published roles.
-- `application_notes` remain superuser-only via the Admin UI.
-- `applications` and `email_logs` are created only by the **`submission_service`** auth account used by the Astro server (not the superuser).
-- Applications are always created through the Astro API route, not directly from the browser.
+- `jobs` is public **list/view** for **published** roles only. Authenticated portal users (`users` with `role` + `active`) can list and view jobs in any status per migration rules.
+- `application_notes` are readable and creatable from the recruiter portal; each note’s **`author`** must match the signed-in user (enforced by PocketBase rules).
+- `applications` and `email_logs` are created by the **`submission_service`** auth account used by the Astro server (not the superuser). Portal users may update **`applications.status`** only (see `pocketbase/pb_hooks/applications_portal_updates.pb.js`).
+- Applications from candidates are always created through the Astro API route, not directly from the browser.
 - PocketBase's built-in plain-text field UI does not expose a configurable large Markdown textarea for `text` fields, so the schema uses clearer field names and help text rather than a custom editor.
 
 ## Production Build
@@ -153,7 +165,7 @@ apps/web/dist/server/entry.mjs
 
 Files:
 
-- [`docker/Dockerfile.web`](docker/Dockerfile.web) — Node 20, builds Astro, runs `dist/server/entry.mjs`
+- [`docker/Dockerfile.web`](docker/Dockerfile.web) — Node 20, builds Astro, runs `dist/server/entry.mjs`. **Build args** are limited to non-secrets (`PUBLIC_*`, optional `MAX_CV_SIZE_BYTES`). `POCKETBASE_URL`, API keys, `FORM_SIGNING_SECRET`, and the submission-service password are **not** passed at image build time; the running container loads them from `env_file` / `environment` in Compose so they are not baked into image layers.
 - [`docker/Dockerfile.pocketbase`](docker/Dockerfile.pocketbase) — PocketBase + migrations
 - [`docker/docker-compose.yml`](docker/docker-compose.yml) — **local / dev**: publishes `4321` (web) and `8090` (PocketBase)
 - [`docker/docker-compose.prod.yml`](docker/docker-compose.prod.yml) — **production**: Caddy on `80`/`443`, web and PocketBase **not** on public ports; PocketBase also on `127.0.0.1:8090` for SSH tunnel admin access
@@ -235,10 +247,18 @@ APP_ROOT=/opt/minihire ./scripts/backup.sh
 
 The script:
 
-- creates a safe SQLite backup using `sqlite3 .backup`
+- creates a safe SQLite backup using `sqlite3 .backup` (host `sqlite3` for bind-mounted data; container `sqlite3` when using `POCKETBASE_DOCKER_CONTAINER`)
 - copies the PocketBase storage directory
 - creates a timestamped archive
 - keeps the latest 14 backup files
+
+**Docker production:** data lives in the `pocketbase` container under `/pb_data`, not on the host path above. Either bind-mount `pb_data` and set `POCKETBASE_DATA_DIR`, or run with a container name (requires a PocketBase image that includes `sqlite3` — see `docker/Dockerfile.pocketbase`):
+
+```bash
+export POCKETBASE_DOCKER_CONTAINER=minihire-pocketbase
+export BACKUP_DIR=/opt/minihire/backups   # optional; defaults under APP_ROOT
+./scripts/backup.sh
+```
 
 Backup files use this format:
 
