@@ -1,9 +1,15 @@
 /** Max length for IPv6 textual form (with zone) — PocketBase field uses 45. */
 const MAX_SUBMISSION_IP_LEN = 45;
 
-const IP_WHO_IS_BASE = "https://ipwho.is";
+/**
+ * HTTPS JSON API suitable for **server-side** lookups (unlike ipwho.is free tier, which returns 403
+ * outside browser CORS).
+ *
+ * @see https://www.geojs.io/docs/v1/endpoints/geo
+ */
+const GEOJS_BASE = "https://get.geojs.io/v1/ip/geo";
 
-/** Some providers throttle or block requests with no / generic UA from cloud IPs. */
+/** Some networks throttle unknown clients; identify the app. */
 const GEO_LOOKUP_USER_AGENT = "minihire/1.0 (+https://github.com/noam-r/minihire; applicant geolocation)";
 
 const GEO_FETCH_TIMEOUT_MS = 5000;
@@ -54,9 +60,7 @@ export function isNonPublicOrUnknownIp(ip: string): boolean {
   return false;
 }
 
-type IpWhoIsPayload = {
-  success?: boolean;
-  message?: string;
+type GeoJsPayload = {
   city?: string;
   region?: string;
   country?: string;
@@ -67,7 +71,7 @@ function logGeo(reason: string, ip: string, extra?: string): void {
   console.warn(`[submission-ip-geolocation] ${reason} ip=${ip}${tail}`);
 }
 
-function buildLabelFromPayload(data: IpWhoIsPayload): string | null {
+function buildLabelFromPayload(data: GeoJsPayload): string | null {
   const parts = [data.city, data.region, data.country]
     .map((x) => String(x ?? "").trim())
     .filter(Boolean);
@@ -79,14 +83,14 @@ function buildLabelFromPayload(data: IpWhoIsPayload): string | null {
   return parts.join(", ").slice(0, 200);
 }
 
-async function fetchIpWhoPayload(ip: string): Promise<{
+async function fetchGeoJsPayload(ip: string): Promise<{
   ok: boolean;
   status: number;
-  payload?: IpWhoIsPayload;
+  payload?: GeoJsPayload;
   bodySnippet?: string;
   networkError?: string;
 }> {
-  const url = `${IP_WHO_IS_BASE}/${encodeURIComponent(ip)}`;
+  const url = `${GEOJS_BASE}/${encodeURIComponent(ip)}.json`;
 
   try {
     const res = await fetch(url, {
@@ -105,9 +109,9 @@ async function fetchIpWhoPayload(ip: string): Promise<{
       return { ok: false, status: res.status, bodySnippet: snippet };
     }
 
-    let payload: IpWhoIsPayload;
+    let payload: GeoJsPayload;
     try {
-      payload = JSON.parse(text) as IpWhoIsPayload;
+      payload = JSON.parse(text) as GeoJsPayload;
     } catch {
       return { ok: false, status: res.status, bodySnippet: snippet };
     }
@@ -122,14 +126,14 @@ async function fetchIpWhoPayload(ip: string): Promise<{
 /**
  * Best-effort city/region/country label from the submission IP.
  *
- * Implementation: **HTTPS GET** to `https://ipwho.is/<ip>` (no API key). The JSON includes
- * `city`, `region` (e.g. state), and `country`; we join whichever are non-empty (max 200 chars).
+ * Uses **GeoJS** (`get.geojs.io`) over HTTPS — intended for server-side use. Response fields
+ * `city`, `region`, and `country` are joined when present (max 200 characters).
  *
  * Returns **null** when the IP is private/unknown (lookup skipped), the HTTP call fails, times out,
- * `success` is explicitly **false**, JSON is invalid, or no location fields are present.
+ * the response is not JSON, or no location fields are present.
  *
  * **Operations:** If this always returns null in production, check **container egress** (security
- * group / NAT) to `ipwho.is:443`, DNS, and server logs for lines starting with
+ * group / NAT) to `get.geojs.io:443`, DNS, and server logs for lines starting with
  * `[submission-ip-geolocation]`.
  */
 export async function resolveIpLocationLabel(ip: string): Promise<string | null> {
@@ -139,7 +143,7 @@ export async function resolveIpLocationLabel(ip: string): Promise<string | null>
   }
 
   for (let attempt = 1; attempt <= 2; attempt++) {
-    const result = await fetchIpWhoPayload(normalized);
+    const result = await fetchGeoJsPayload(normalized);
 
     if (result.networkError) {
       logGeo(
@@ -169,13 +173,6 @@ export async function resolveIpLocationLabel(ip: string): Promise<string | null>
     }
 
     const data = result.payload;
-
-    if (data.success === false) {
-      const msg = data.message ? String(data.message).slice(0, 160) : "";
-      logGeo("api_success_false", normalized, msg);
-      return null;
-    }
-
     const label = buildLabelFromPayload(data);
     if (!label) {
       logGeo("no_city_region_country", normalized, `keys=${Object.keys(data).join(",")}`);

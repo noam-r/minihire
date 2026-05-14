@@ -19,10 +19,10 @@ Ensure your origin is reached **only** via the CDN so clients cannot spoof `CF-C
 
 ### Application IP geolocation (troubleshooting)
 
-When a candidate applies, the **`web` container** resolves an approximate city/region/country by calling **outbound HTTPS** to `https://ipwho.is/<ip>` (no API key). If **Approximate location (from IP)** is empty but the stored IP looks like a normal public address:
+When a candidate applies, the **`web` container** resolves an approximate city/region/country by calling **outbound HTTPS** to **GeoJS** (`https://get.geojs.io/v1/ip/geo/<ip>.json`, no API key). If **Approximate location (from IP)** is empty but the stored IP looks like a normal public address:
 
-- **Egress:** Ensure the instance / VPC allows **HTTPS outbound** (TCP 443) from the `web` service to the internet. A locked-down default-deny egress rule will cause timeouts and an empty location.
-- **Logs:** Search web container logs for **`[submission-ip-geolocation]`** (timeouts, non-JSON responses, HTTP errors, or `api_success_false` from the provider).
+- **Egress:** Ensure the instance / VPC allows **HTTPS outbound** (TCP 443) from the `web` service to the internet (e.g. `get.geojs.io`). A locked-down default-deny egress rule will cause timeouts and an empty location.
+- **Logs:** Search web container logs for **`[submission-ip-geolocation]`** (timeouts, non-JSON responses, HTTP errors, or empty location fields in the response).
 - **Duplicate applications:** If the same person applies again to the same job (same duplicate key), the app reuses the existing application row and **does not** re-run geolocation; an empty location from the first create will stay empty until you edit the record or they get a new application row.
 
 ## 1. EC2 instance
