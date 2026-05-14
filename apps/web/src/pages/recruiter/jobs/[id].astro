@@ -12,6 +12,8 @@ import { getCompanyName } from "../../../lib/site";
 
 export const prerender = false;
 
+const RECENT_APPLICATIONS = 15;
+
 function publishedAtForInput(raw: unknown): string {
   if (raw == null || raw === "") {
     return "";
@@ -64,10 +66,12 @@ try {
   return Astro.redirect("/recruiter/jobs");
 }
 
-const apps = await pb.collection("applications").getFullList({
+const appsResult = await pb.collection("applications").getList(1, RECENT_APPLICATIONS, {
   filter: pb.filter("job = {:jid}", { jid: job.id }),
   sort: "-submitted_at",
 });
+const recentApps = appsResult.items;
+const totalAppCount = appsResult.totalItems;
 
 const publishedAtValue = publishedAtForInput(job.publishedAt);
 const postingTiming = jobPostingTimingLine(job, now);
@@ -80,6 +84,9 @@ const niceLines = splitLinesToList(typeof job.niceToHaveSkills === "string" ? jo
 
 const workModelLabel = formatWorkModel(job.workModel as "remote" | "hybrid" | "onsite");
 const employmentLabel = formatEmploymentType(job.employmentType as "full_time" | "part_time" | "contract" | "internship");
+
+const editSummaryClass =
+  "cursor-pointer select-none rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-teal-800 shadow-sm hover:bg-slate-50 list-none [&::-webkit-details-marker]:hidden";
 ---
 
 <RecruiterLayout title={`${job.title} | ${companyName}`}>
@@ -89,7 +96,33 @@ const employmentLabel = formatEmploymentType(job.employmentType as "full_time" |
       <span class="mx-2 text-slate-300">|</span>
       <a class="text-teal-800 hover:text-teal-900" href="/recruiter/applications">Applications</a>
     </p>
-    <h1 class="mt-2 text-2xl font-semibold tracking-tight text-slate-900 md:text-3xl">{job.title}</h1>
+    <div class="mt-2 flex flex-wrap items-start justify-between gap-3">
+      <h1 class="text-2xl font-semibold tracking-tight text-slate-900 md:text-3xl">{job.title}</h1>
+      {
+        isAdmin && (
+          <details class="min-w-0 shrink-0 rounded-lg border border-slate-200 bg-slate-50/80 open:bg-white open:shadow-sm">
+            <summary class={editSummaryClass}>Edit title</summary>
+            <form method="post" action="/recruiter/actions/job-update" class="border-t border-slate-200 p-3">
+              <input type="hidden" name="csrf" value={csrf} />
+              <input type="hidden" name="job_id" value={job.id} />
+              <label class="block text-xs font-medium text-slate-700" for="edit-title">Title</label>
+              <input
+                id="edit-title"
+                name="title"
+                type="text"
+                required
+                maxlength={200}
+                value={job.title}
+                class="mt-1 w-full min-w-[12rem] rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600"
+              />
+              <button type="submit" class="btn-primary btn-sm mt-2 w-full justify-center">
+                Save title
+              </button>
+            </form>
+          </details>
+        )
+      }
+    </div>
     <p class="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm text-slate-600">
       <span class="font-medium text-slate-700">Listing status:</span>
       <span class="font-medium text-slate-900">{job.status}</span>
@@ -117,52 +150,166 @@ const employmentLabel = formatEmploymentType(job.employmentType as "full_time" |
     )
   }
 
-  <div class="flex flex-col-reverse gap-8 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(280px,22rem)] lg:items-start lg:gap-10">
-    <div class="min-w-0 space-y-6" role="region" aria-labelledby="job-read-heading">
+  <div class="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(280px,22rem)] lg:items-start lg:gap-10">
+    <div class="min-w-0 space-y-6" role="region" aria-labelledby="job-detail-heading">
       <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <header class="border-b border-slate-100 bg-slate-50/80 px-5 py-4">
-          <h2 id="job-read-heading" class="text-base font-semibold text-slate-900">Job listing</h2>
+          <h2 id="job-detail-heading" class="text-base font-semibold text-slate-900">Job</h2>
           <p class="mt-1 text-xs leading-relaxed text-slate-600">
-            Read-only: what candidates see on the careers site depends on status; this is the full record in the portal.
+            One view of the listing. Admins: use Edit to change a field; other values stay as they are.
           </p>
         </header>
 
         <div class="divide-y divide-slate-100">
           <div class="px-5 py-4">
-            <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-500">Key facts</h3>
-            <dl class="mt-3 space-y-3 text-sm">
-              <div class="flex flex-col gap-0.5 sm:flex-row sm:justify-between sm:gap-4">
-                <dt class="font-medium text-slate-600">Slug</dt>
-                <dd class="min-w-0 break-all font-mono text-xs text-slate-900 sm:max-w-[70%] sm:text-right">{job.slug}</dd>
-              </div>
+            <div class="flex flex-wrap items-start justify-between gap-2">
+              <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-500">Slug & URL</h3>
+              {
+                isAdmin && (
+                  <details class="rounded-lg border border-slate-200 bg-slate-50/80 open:bg-white open:shadow-sm">
+                    <summary class={editSummaryClass}>Edit slug</summary>
+                    <form method="post" action="/recruiter/actions/job-update" class="border-t border-slate-200 p-3">
+                      <input type="hidden" name="csrf" value={csrf} />
+                      <input type="hidden" name="job_id" value={job.id} />
+                      <label class="block text-xs font-medium text-slate-700" for="edit-slug">Slug</label>
+                      <input
+                        id="edit-slug"
+                        name="slug"
+                        type="text"
+                        required
+                        maxlength={120}
+                        pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
+                        title="Lowercase letters, numbers, and hyphens only"
+                        value={job.slug}
+                        class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 font-mono text-sm text-slate-900 shadow-sm focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600"
+                      />
+                      <button type="submit" class="btn-primary btn-sm mt-2 w-full justify-center">Save slug</button>
+                    </form>
+                  </details>
+                )
+              }
+            </div>
+            <p class="mt-2 break-all font-mono text-sm text-slate-800">{job.slug}</p>
+          </div>
+
+          <div class="px-5 py-4">
+            <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-500">Work & employment</h3>
+            <dl class="mt-3 space-y-2 text-sm text-slate-800">
               <div class="flex flex-col gap-0.5 sm:flex-row sm:justify-between sm:gap-4">
                 <dt class="font-medium text-slate-600">Work model</dt>
-                <dd class="text-slate-900 sm:text-right">{workModelLabel}</dd>
+                <dd class="sm:text-right">{workModelLabel}</dd>
               </div>
               <div class="flex flex-col gap-0.5 sm:flex-row sm:justify-between sm:gap-4">
                 <dt class="font-medium text-slate-600">Employment type</dt>
-                <dd class="text-slate-900 sm:text-right">{employmentLabel}</dd>
+                <dd class="sm:text-right">{employmentLabel}</dd>
               </div>
               <div class="flex flex-col gap-0.5 sm:flex-row sm:justify-between sm:gap-4">
                 <dt class="font-medium text-slate-600">Work location</dt>
-                <dd class="min-w-0 break-words text-slate-900 sm:max-w-[70%] sm:text-right">
-                  {optionalApplicantText(job.workLocation)}
-                </dd>
+                <dd class="min-w-0 break-words sm:max-w-[70%] sm:text-right">{optionalApplicantText(job.workLocation)}</dd>
+              </div>
+            </dl>
+            <p class="mt-3 text-xs text-slate-500">Work model, type, and location are edited in PocketBase Admin.</p>
+          </div>
+
+          <div class="px-5 py-4">
+            <div class="flex flex-wrap items-start justify-between gap-2">
+              <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-500">Publishing</h3>
+              {
+                isAdmin && (
+                  <details class="rounded-lg border border-slate-200 bg-slate-50/80 open:bg-white open:shadow-sm">
+                    <summary class={editSummaryClass}>Edit status & date</summary>
+                    <form method="post" action="/recruiter/actions/job-update" class="space-y-3 border-t border-slate-200 p-3">
+                      <input type="hidden" name="csrf" value={csrf} />
+                      <input type="hidden" name="job_id" value={job.id} />
+                      <div>
+                        <label class="block text-xs font-medium text-slate-700" for="edit-status">Listing status</label>
+                        <select
+                          id="edit-status"
+                          name="status"
+                          class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600"
+                        >
+                          {JOB_STATUSES.map((s) => (
+                            <option value={s} selected={s === job.status}>
+                              {s}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label class="block text-xs font-medium text-slate-700" for="edit-published-at">Published at</label>
+                        <input
+                          id="edit-published-at"
+                          name="published_at"
+                          type="datetime-local"
+                          value={publishedAtValue}
+                          class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600"
+                        />
+                        <p class="mt-1 text-xs text-slate-500">Leave blank to keep the current published date.</p>
+                      </div>
+                      <button type="submit" class="btn-primary btn-sm w-full justify-center">Save</button>
+                    </form>
+                  </details>
+                )
+              }
+            </div>
+            <dl class="mt-3 space-y-2 text-sm">
+              <div class="flex flex-col gap-0.5 sm:flex-row sm:justify-between sm:gap-4">
+                <dt class="font-medium text-slate-600">Status</dt>
+                <dd class="font-medium text-slate-900 sm:text-right">{job.status}</dd>
               </div>
               <div class="flex flex-col gap-0.5 sm:flex-row sm:justify-between sm:gap-4">
                 <dt class="font-medium text-slate-600">Published at</dt>
-                <dd class="font-mono text-xs text-slate-900 sm:text-right">{formatJobPublishedAtDisplay(job.publishedAt)}</dd>
+                <dd class="font-mono text-xs text-slate-800 sm:text-right">{formatJobPublishedAtDisplay(job.publishedAt)}</dd>
               </div>
             </dl>
           </div>
 
           <div class="px-5 py-4">
-            <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-500">Summary</h3>
+            <div class="flex flex-wrap items-start justify-between gap-2">
+              <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-500">Summary</h3>
+              {
+                isAdmin && (
+                  <details class="rounded-lg border border-slate-200 bg-slate-50/80 open:bg-white open:shadow-sm">
+                    <summary class={editSummaryClass}>Edit summary</summary>
+                    <form method="post" action="/recruiter/actions/job-update" class="border-t border-slate-200 p-3">
+                      <input type="hidden" name="csrf" value={csrf} />
+                      <input type="hidden" name="job_id" value={job.id} />
+                      <textarea
+                        name="summary"
+                        required
+                        maxlength={1000}
+                        rows={5}
+                        class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600">{job.summary}</textarea>
+                      <button type="submit" class="btn-primary btn-sm mt-2 w-full justify-center">Save summary</button>
+                    </form>
+                  </details>
+                )
+              }
+            </div>
             <p class="mt-2 text-sm leading-relaxed text-slate-800">{job.summary}</p>
           </div>
 
           <div class="min-w-0 px-5 py-4">
-            <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-500">Description</h3>
+            <div class="flex flex-wrap items-start justify-between gap-2">
+              <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-500">Description</h3>
+              {
+                isAdmin && (
+                  <details class="max-w-full rounded-lg border border-slate-200 bg-slate-50/80 open:bg-white open:shadow-sm">
+                    <summary class={editSummaryClass}>Edit description</summary>
+                    <form method="post" action="/recruiter/actions/job-update" class="border-t border-slate-200 p-3">
+                      <input type="hidden" name="csrf" value={csrf} />
+                      <input type="hidden" name="job_id" value={job.id} />
+                      <textarea
+                        name="description"
+                        required
+                        rows={14}
+                        class="w-full max-w-full rounded-md border border-slate-300 px-3 py-2 font-mono text-sm text-slate-900 shadow-sm focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600">{job.description}</textarea>
+                      <button type="submit" class="btn-primary btn-sm mt-2 w-full justify-center">Save description</button>
+                    </form>
+                  </details>
+                )
+              }
+            </div>
             <div class="mt-2 max-w-none overflow-x-auto break-words">
               <MarkdownContent content={descriptionMd} class="mt-0" />
             </div>
@@ -228,114 +375,22 @@ const employmentLabel = formatEmploymentType(job.employmentType as "full_time" |
       </section>
     </div>
 
-    <aside class="min-w-0 space-y-6 lg:sticky lg:top-6" aria-labelledby="job-actions-heading">
-      {
-        isAdmin ? (
-          <section class="overflow-hidden rounded-xl border border-teal-200/70 bg-gradient-to-b from-teal-50/90 to-white shadow-sm ring-1 ring-teal-100/80">
-            <header class="border-b border-teal-100/90 px-5 py-4">
-              <h2 id="job-actions-heading" class="text-base font-semibold text-slate-900">Manage listing</h2>
-              <p class="mt-1 text-xs leading-relaxed text-slate-600">
-                Edits apply in PocketBase immediately. The slug must stay unique across all jobs.
-              </p>
-            </header>
-            <form method="post" action="/recruiter/actions/job-update" class="space-y-4 px-5 py-5">
-              <input type="hidden" name="csrf" value={csrf} />
-              <input type="hidden" name="job_id" value={job.id} />
-              <div>
-                <label class="mb-1 block text-xs font-medium text-slate-700" for="title">Title</label>
-                <input
-                  id="title"
-                  name="title"
-                  type="text"
-                  required
-                  maxlength={200}
-                  value={job.title}
-                  class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600"
-                />
-              </div>
-              <div>
-                <label class="mb-1 block text-xs font-medium text-slate-700" for="slug">Slug</label>
-                <input
-                  id="slug"
-                  name="slug"
-                  type="text"
-                  required
-                  maxlength={120}
-                  pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
-                  title="Lowercase letters, numbers, and hyphens only"
-                  value={job.slug}
-                  class="w-full rounded-md border border-slate-300 px-3 py-2 font-mono text-sm text-slate-900 shadow-sm focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600"
-                />
-              </div>
-              <div>
-                <label class="mb-1 block text-xs font-medium text-slate-700" for="summary">Summary</label>
-                <textarea
-                  id="summary"
-                  name="summary"
-                  required
-                  maxlength={1000}
-                  rows={4}
-                  class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600">{job.summary}</textarea>
-              </div>
-              <div>
-                <label class="mb-1 block text-xs font-medium text-slate-700" for="job-description-input">Description (Markdown)</label>
-                <textarea
-                  id="job-description-input"
-                  name="description"
-                  required
-                  rows={10}
-                  class="w-full rounded-md border border-slate-300 px-3 py-2 font-mono text-sm text-slate-900 shadow-sm focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600">{job.description}</textarea>
-              </div>
-              <div>
-                <label class="mb-1 block text-xs font-medium text-slate-700" for="status">Listing status</label>
-                <select
-                  id="status"
-                  name="status"
-                  class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm font-medium text-slate-900 shadow-sm focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600"
-                >
-                  {JOB_STATUSES.map((s) => (
-                    <option value={s} selected={s === job.status}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label class="mb-1 block text-xs font-medium text-slate-700" for="published_at">Published at (optional)</label>
-                <input
-                  id="published_at"
-                  name="published_at"
-                  type="datetime-local"
-                  value={publishedAtValue}
-                  class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600"
-                />
-                <p class="mt-1 text-xs text-slate-500">Leave empty to keep the current published-at value.</p>
-              </div>
-              <button type="submit" class="btn-primary w-full justify-center py-2.5 text-sm font-semibold">
-                Save job
-              </button>
-            </form>
-          </section>
-        ) : (
-          <section
-            class="overflow-hidden rounded-xl border border-slate-200 bg-slate-50/90 px-5 py-4 text-sm text-slate-700 shadow-sm"
-            aria-labelledby="job-actions-heading"
-          >
-            <h2 id="job-actions-heading" class="text-sm font-semibold text-slate-900">
-              Listing edits
-            </h2>
-            <p class="mt-2 leading-relaxed">
-              Only admins can change job text and status. Open an application from the list below to review candidates.
-            </p>
-          </section>
-        )
-      }
-
+    <aside class="min-w-0 space-y-4 lg:sticky lg:top-6" aria-labelledby="recent-applications-heading">
       <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <header class="flex flex-wrap items-end justify-between gap-2 border-b border-slate-100 px-5 py-3">
           <div>
-            <h2 class="text-sm font-semibold text-slate-900">Applications</h2>
-            <p class="text-xs text-slate-500">{apps.length} total</p>
+            <h2 id="recent-applications-heading" class="text-sm font-semibold text-slate-900">Recent candidates</h2>
+            <p class="text-xs text-slate-500">
+              Latest {RECENT_APPLICATIONS}
+              {totalAppCount > RECENT_APPLICATIONS ? (
+                <>
+                  {" "}
+                  of <span class="font-medium text-slate-700">{totalAppCount}</span> total
+                </>
+              ) : (
+                ""
+              )}
+            </p>
           </div>
           {
             job.status === "published" && typeof job.slug === "string" && job.slug.length > 0 ? (
@@ -350,12 +405,12 @@ const employmentLabel = formatEmploymentType(job.employmentType as "full_time" |
             ) : null
           }
         </header>
-        <ul class="max-h-[min(28rem,55vh)] divide-y divide-slate-100 overflow-y-auto text-sm">
+        <ul class="max-h-[min(32rem,60vh)] divide-y divide-slate-100 overflow-y-auto text-sm">
           {
-            apps.length === 0 ? (
+            recentApps.length === 0 ? (
               <li class="px-4 py-6 text-slate-600">No applications for this job.</li>
             ) : (
-              apps.map((a) => (
+              recentApps.map((a) => (
                 <li class="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                   <div class="min-w-0">
                     <div class="font-medium text-slate-900">{a.full_name}</div>
@@ -376,6 +431,16 @@ const employmentLabel = formatEmploymentType(job.employmentType as "full_time" |
             )
           }
         </ul>
+        {
+          totalAppCount > RECENT_APPLICATIONS ? (
+            <p class="border-t border-slate-100 px-4 py-3 text-center text-xs text-slate-600">
+              <a class="font-medium text-teal-800 hover:text-teal-900" href="/recruiter/applications">
+                View all applications
+              </a>{" "}
+              for older submissions.
+            </p>
+          ) : null
+        }
       </section>
     </aside>
   </div>

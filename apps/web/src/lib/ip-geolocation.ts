@@ -3,6 +3,11 @@ const MAX_SUBMISSION_IP_LEN = 45;
 
 const IP_WHO_IS_BASE = "https://ipwho.is";
 
+/** Some providers throttle or block requests with no / generic UA from cloud IPs. */
+const GEO_LOOKUP_USER_AGENT = "minihire/1.0 (+https://github.com/noam-r/minihire; applicant geolocation)";
+
+const GEO_FETCH_TIMEOUT_MS = 5000;
+
 /**
  * Truncate and trim the IP we persist on the application record.
  */
@@ -51,10 +56,68 @@ export function isNonPublicOrUnknownIp(ip: string): boolean {
 
 type IpWhoIsPayload = {
   success?: boolean;
+  message?: string;
   city?: string;
   region?: string;
   country?: string;
 };
+
+function logGeo(reason: string, ip: string, extra?: string): void {
+  const tail = extra ? ` ${extra}` : "";
+  console.warn(`[submission-ip-geolocation] ${reason} ip=${ip}${tail}`);
+}
+
+function buildLabelFromPayload(data: IpWhoIsPayload): string | null {
+  const parts = [data.city, data.region, data.country]
+    .map((x) => String(x ?? "").trim())
+    .filter(Boolean);
+
+  if (parts.length === 0) {
+    return null;
+  }
+
+  return parts.join(", ").slice(0, 200);
+}
+
+async function fetchIpWhoPayload(ip: string): Promise<{
+  ok: boolean;
+  status: number;
+  payload?: IpWhoIsPayload;
+  bodySnippet?: string;
+  networkError?: string;
+}> {
+  const url = `${IP_WHO_IS_BASE}/${encodeURIComponent(ip)}`;
+
+  try {
+    const res = await fetch(url, {
+      method: "GET",
+      headers: {
+        accept: "application/json",
+        "user-agent": GEO_LOOKUP_USER_AGENT,
+      },
+      signal: AbortSignal.timeout(GEO_FETCH_TIMEOUT_MS),
+    });
+
+    const text = await res.text();
+    const snippet = text.replace(/\s+/g, " ").slice(0, 200);
+
+    if (!res.ok) {
+      return { ok: false, status: res.status, bodySnippet: snippet };
+    }
+
+    let payload: IpWhoIsPayload;
+    try {
+      payload = JSON.parse(text) as IpWhoIsPayload;
+    } catch {
+      return { ok: false, status: res.status, bodySnippet: snippet };
+    }
+
+    return { ok: true, status: res.status, payload };
+  } catch (e) {
+    const networkError = e instanceof Error ? e.message : String(e);
+    return { ok: false, status: 0, networkError };
+  }
+}
 
 /**
  * Best-effort city/region/country label from the submission IP.
@@ -62,10 +125,12 @@ type IpWhoIsPayload = {
  * Implementation: **HTTPS GET** to `https://ipwho.is/<ip>` (no API key). The JSON includes
  * `city`, `region` (e.g. state), and `country`; we join whichever are non-empty (max 200 chars).
  *
- * Returns **null** when the IP is private/unknown (lookup skipped), the HTTP call fails, times out
- * (2.5s), `success` is false, or no location fields are present. **CDN edge IPs** (e.g. wrong
- * client IP) may still return a datacenter/POP city — use `getClientIpFromRequest` so the stored
- * IP is the real visitor when behind Cloudflare.
+ * Returns **null** when the IP is private/unknown (lookup skipped), the HTTP call fails, times out,
+ * `success` is explicitly **false**, JSON is invalid, or no location fields are present.
+ *
+ * **Operations:** If this always returns null in production, check **container egress** (security
+ * group / NAT) to `ipwho.is:443`, DNS, and server logs for lines starting with
+ * `[submission-ip-geolocation]`.
  */
 export async function resolveIpLocationLabel(ip: string): Promise<string | null> {
   const normalized = normalizeSubmissionIp(ip);
@@ -73,34 +138,52 @@ export async function resolveIpLocationLabel(ip: string): Promise<string | null>
     return null;
   }
 
-  const url = `${IP_WHO_IS_BASE}/${encodeURIComponent(normalized)}`;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const result = await fetchIpWhoPayload(normalized);
 
-  try {
-    const res = await fetch(url, {
-      method: "GET",
-      headers: { accept: "application/json" },
-      signal: AbortSignal.timeout(2500),
-    });
-
-    if (!res.ok) {
+    if (result.networkError) {
+      logGeo(
+        attempt === 1 ? "fetch_error_retrying" : "fetch_error",
+        normalized,
+        `err=${result.networkError.slice(0, 120)}`,
+      );
+      if (attempt === 1) {
+        await new Promise((r) => setTimeout(r, 400));
+        continue;
+      }
       return null;
     }
 
-    const data = (await res.json()) as IpWhoIsPayload;
+    if (!result.ok || !result.payload) {
+      const willRetry = attempt === 1 && result.status >= 500;
+      logGeo(
+        willRetry ? "http_error_will_retry" : "http_error",
+        normalized,
+        `http=${result.status} body=${result.bodySnippet ?? ""}`,
+      );
+      if (willRetry) {
+        await new Promise((r) => setTimeout(r, 400));
+        continue;
+      }
+      return null;
+    }
+
+    const data = result.payload;
+
     if (data.success === false) {
+      const msg = data.message ? String(data.message).slice(0, 160) : "";
+      logGeo("api_success_false", normalized, msg);
       return null;
     }
 
-    const parts = [data.city, data.region, data.country]
-      .map((x) => String(x ?? "").trim())
-      .filter(Boolean);
-
-    if (parts.length === 0) {
+    const label = buildLabelFromPayload(data);
+    if (!label) {
+      logGeo("no_city_region_country", normalized, `keys=${Object.keys(data).join(",")}`);
       return null;
     }
 
-    return parts.join(", ").slice(0, 200);
-  } catch {
-    return null;
+    return label;
   }
+
+  return null;
 }

@@ -40,12 +40,27 @@ export const POST: APIRoute = async (context) => {
     return redirect("/recruiter/jobs?error=invalid", 303);
   }
 
-  const title = String(body.get("title") ?? "").trim();
-  const slug = String(body.get("slug") ?? "").trim();
-  const summary = String(body.get("summary") ?? "").trim();
-  const description = String(body.get("description") ?? "").trim();
-  const status = String(body.get("status") ?? "").trim();
-  const publishedAtRaw = String(body.get("published_at") ?? "").trim();
+  const { pb } = session;
+
+  let existing;
+  try {
+    existing = await pb.collection("jobs").getOne(jobId);
+  } catch {
+    return redirect("/recruiter/jobs?error=invalid", 303);
+  }
+
+  const pick = (field: string, fallback: string): string => {
+    if (!body.has(field)) {
+      return fallback;
+    }
+    return String(body.get(field) ?? "").trim();
+  };
+
+  const title = pick("title", String(existing.title ?? "").trim());
+  const slug = pick("slug", String(existing.slug ?? "").trim());
+  const summary = pick("summary", String(existing.summary ?? "").trim());
+  const description = pick("description", String(existing.description ?? "").trim());
+  const statusRaw = body.has("status") ? String(body.get("status") ?? "").trim() : String(existing.status ?? "").trim();
 
   if (!title || title.length > 200) {
     return redirect(`/recruiter/jobs/${jobId}?error=fields`, 303);
@@ -59,26 +74,27 @@ export const POST: APIRoute = async (context) => {
   if (!description || description.length < 1) {
     return redirect(`/recruiter/jobs/${jobId}?error=fields`, 303);
   }
-  if (!isJobStatus(status)) {
+  if (!isJobStatus(statusRaw)) {
     return redirect(`/recruiter/jobs/${jobId}?error=status`, 303);
   }
-
-  const { pb } = session;
 
   const payload: Record<string, unknown> = {
     title,
     slug,
     summary,
     description,
-    status,
+    status: statusRaw,
   };
 
-  if (publishedAtRaw) {
-    const d = new Date(publishedAtRaw);
-    if (Number.isNaN(d.getTime())) {
-      return redirect(`/recruiter/jobs/${jobId}?error=date`, 303);
+  if (body.has("published_at")) {
+    const publishedAtRaw = String(body.get("published_at") ?? "").trim();
+    if (publishedAtRaw) {
+      const d = new Date(publishedAtRaw);
+      if (Number.isNaN(d.getTime())) {
+        return redirect(`/recruiter/jobs/${jobId}?error=date`, 303);
+      }
+      payload.publishedAt = d.toISOString();
     }
-    payload.publishedAt = d.toISOString();
   }
 
   try {
