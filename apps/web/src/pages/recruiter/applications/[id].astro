@@ -1,6 +1,16 @@
 ---
 import RecruiterLayout from "../../../layouts/RecruiterLayout.astro";
 import { APPLICATION_STATUSES } from "../../../lib/application-statuses";
+import {
+  cvFilename,
+  formatConsent,
+  formatSubmittedAt,
+  NOT_PROVIDED,
+  optionalApplicantText,
+  optionalApplicantUrl,
+  requiredApplicantText,
+  trimStr,
+} from "../../../lib/recruiter-application-display";
 import { recruiterApplicationDetailErrors } from "../../../lib/recruiter-flash";
 import { ensureSessionCsrfCookie } from "../../../lib/recruiter-auth/cookies";
 import { formatRelativeTime } from "../../../lib/relative-time";
@@ -60,7 +70,14 @@ const [notesRaw, historyRaw] = await Promise.all([
 const notes = [...notesRaw].sort(compareByCreatedThenId);
 const history = [...historyRaw].sort((a, b) => compareByCreatedThenId(b, a));
 
-const job = record.expand?.job as { title?: string; slug?: string } | undefined;
+const job = record.expand?.job as { id?: string; title?: string; slug?: string } | undefined;
+const jobId = String(record.job ?? job?.id ?? "");
+const jobTitle = trimStr(job?.title) !== "" ? trimStr(job?.title) : jobId !== "" ? "Job listing" : "Application";
+const jobHref = jobId !== "" ? `/recruiter/jobs/${jobId}` : undefined;
+
+const githubUrl = optionalApplicantUrl(record.github_url);
+const portfolioUrl = optionalApplicantUrl(record.portfolio_url);
+const linkedinUrl = optionalApplicantUrl(record.linkedin_url);
 ---
 
 <RecruiterLayout title={`${record.full_name} | ${companyName}`}>
@@ -69,8 +86,18 @@ const job = record.expand?.job as { title?: string; slug?: string } | undefined;
     <span class="mx-2 text-slate-300">|</span>
     <a class="text-teal-800 hover:text-teal-900" href="/recruiter/jobs">Jobs</a>
   </p>
-  <h1 class="mt-2 text-2xl font-semibold text-slate-900">{record.full_name}</h1>
-  <p class="text-sm text-slate-600">{job?.title ?? "Application"}</p>
+  <h1 class="mt-2 text-2xl font-semibold text-slate-900">{requiredApplicantText(record.full_name)}</h1>
+  <p class="text-sm text-slate-600">
+    {
+      jobHref ? (
+        <a class="text-teal-800 hover:text-teal-900" href={jobHref}>
+          {jobTitle}
+        </a>
+      ) : (
+        jobTitle
+      )
+    }
+  </p>
 
   {
     flash.updated && (
@@ -88,23 +115,146 @@ const job = record.expand?.job as { title?: string; slug?: string } | undefined;
     )
   }
 
-  <dl class="mt-8 grid max-w-xl gap-3 text-sm">
-    <div class="flex justify-between gap-4 border-b border-slate-100 py-2">
-      <dt class="text-slate-500">Email</dt>
-      <dd class="text-slate-900">{record.email}</dd>
-    </div>
-    <div class="flex justify-between gap-4 border-b border-slate-100 py-2">
-      <dt class="text-slate-500">Status</dt>
-      <dd class="text-slate-900">{record.status}</dd>
-    </div>
-    <div class="flex justify-between gap-4 border-b border-slate-100 py-2">
-      <dt class="text-slate-500">Submitted</dt>
-      <dd class="text-right text-slate-900">
-        <div class="font-medium">{formatRelativeTime(record.submitted_at, now)}</div>
-        <div class="text-xs font-normal text-slate-500">{String(record.submitted_at ?? "").slice(0, 19).replace("T", " ")}</div>
-      </dd>
-    </div>
-  </dl>
+  <section class="mt-8 max-w-2xl">
+    <h2 class="text-lg font-semibold text-slate-900">Candidate responses</h2>
+    <p class="mt-1 text-xs text-slate-500">
+      Every field from the application form is listed. Optional fields show &ldquo;{NOT_PROVIDED}&rdquo; when the candidate left them blank.
+    </p>
+    <dl class="mt-4 divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white text-sm">
+      <div class="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:justify-between sm:gap-6">
+        <dt class="shrink-0 font-medium text-slate-600">Full name</dt>
+        <dd class="min-w-0 break-words text-right text-slate-900 sm:text-right">{requiredApplicantText(record.full_name)}</dd>
+      </div>
+      <div class="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:justify-between sm:gap-6">
+        <dt class="shrink-0 font-medium text-slate-600">Email</dt>
+        <dd class="min-w-0 break-all text-right text-slate-900 sm:text-right">
+          <a class="text-teal-800 hover:text-teal-900" href={`mailto:${requiredApplicantText(record.email)}`}>
+            {requiredApplicantText(record.email)}
+          </a>
+        </dd>
+      </div>
+      <div class="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:justify-between sm:gap-6">
+        <dt class="shrink-0 font-medium text-slate-600">Phone</dt>
+        <dd class="min-w-0 break-words text-right text-slate-900 sm:text-right">{optionalApplicantText(record.phone_number)}</dd>
+      </div>
+      <div class="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:justify-between sm:gap-6">
+        <dt class="shrink-0 font-medium text-slate-600">Location</dt>
+        <dd class="min-w-0 break-words text-right text-slate-900 sm:text-right">{optionalApplicantText(record.location)}</dd>
+      </div>
+      <div class="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:justify-between sm:gap-6">
+        <dt class="shrink-0 font-medium text-slate-600">Timezone</dt>
+        <dd class="min-w-0 break-words text-right text-slate-900 sm:text-right">{optionalApplicantText(record.timezone)}</dd>
+      </div>
+      <div class="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:justify-between sm:gap-6">
+        <dt class="shrink-0 font-medium text-slate-600">GitHub</dt>
+        <dd class="min-w-0 text-right sm:text-right">
+          {
+            githubUrl ? (
+              <a class="break-all text-teal-800 hover:text-teal-900" href={githubUrl} rel="noopener noreferrer" target="_blank">
+                {githubUrl}
+              </a>
+            ) : (
+              <span class="text-slate-500">{NOT_PROVIDED}</span>
+            )
+          }
+        </dd>
+      </div>
+      <div class="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:justify-between sm:gap-6">
+        <dt class="shrink-0 font-medium text-slate-600">Portfolio</dt>
+        <dd class="min-w-0 text-right sm:text-right">
+          {
+            portfolioUrl ? (
+              <a class="break-all text-teal-800 hover:text-teal-900" href={portfolioUrl} rel="noopener noreferrer" target="_blank">
+                {portfolioUrl}
+              </a>
+            ) : (
+              <span class="text-slate-500">{NOT_PROVIDED}</span>
+            )
+          }
+        </dd>
+      </div>
+      <div class="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:justify-between sm:gap-6">
+        <dt class="shrink-0 font-medium text-slate-600">LinkedIn</dt>
+        <dd class="min-w-0 text-right sm:text-right">
+          {
+            linkedinUrl ? (
+              <a class="break-all text-teal-800 hover:text-teal-900" href={linkedinUrl} rel="noopener noreferrer" target="_blank">
+                {linkedinUrl}
+              </a>
+            ) : (
+              <span class="text-slate-500">{NOT_PROVIDED}</span>
+            )
+          }
+        </dd>
+      </div>
+      <div class="flex flex-col gap-1 px-4 py-3">
+        <dt class="font-medium text-slate-600">Anything else</dt>
+        <dd class="mt-1 whitespace-pre-wrap break-words text-slate-900">{optionalApplicantText(record.anything_else)}</dd>
+      </div>
+      <div class="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+        <div>
+          <dt class="font-medium text-slate-600">CV / resume</dt>
+          <dd class="mt-1 font-mono text-xs text-slate-700">{cvFilename(record.cv_file)}</dd>
+        </div>
+        <div class="shrink-0">
+          <a
+            class="btn-primary btn-sm"
+            href={`/recruiter/applications/${record.id}/cv`}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Download CV
+          </a>
+        </div>
+      </div>
+      <div class="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:justify-between sm:gap-6">
+        <dt class="shrink-0 font-medium text-slate-600">Consent to store data</dt>
+        <dd class="text-right text-slate-900 sm:text-right">{formatConsent(record.consent_to_store_data)}</dd>
+      </div>
+    </dl>
+  </section>
+
+  <section class="mt-10 max-w-2xl">
+    <h2 class="text-lg font-semibold text-slate-900">Pipeline</h2>
+    <dl class="mt-3 divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white text-sm">
+      <div class="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:justify-between sm:gap-6">
+        <dt class="shrink-0 font-medium text-slate-600">Status</dt>
+        <dd class="text-right font-medium text-slate-900 sm:text-right">{requiredApplicantText(record.status)}</dd>
+      </div>
+      <div class="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:justify-between sm:gap-6">
+        <dt class="shrink-0 font-medium text-slate-600">Submitted</dt>
+        <dd class="text-right text-slate-900 sm:text-right">
+          <div class="font-medium">{formatRelativeTime(record.submitted_at, now)}</div>
+          <div class="text-xs font-normal text-slate-500">{formatSubmittedAt(record.submitted_at)}</div>
+        </dd>
+      </div>
+    </dl>
+  </section>
+
+  <section class="mt-10 max-w-2xl">
+    <h2 class="text-lg font-semibold text-slate-900">Submission metadata</h2>
+    <p class="mt-1 text-xs text-slate-500">Captured automatically with the application (not shown on the public form).</p>
+    <dl class="mt-3 divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white text-sm">
+      <div class="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:justify-between sm:gap-6">
+        <dt class="shrink-0 font-medium text-slate-600">Source</dt>
+        <dd class="min-w-0 break-words text-right text-slate-900 sm:text-right">{optionalApplicantText(record.source)}</dd>
+      </div>
+      <div class="flex flex-col gap-1 px-4 py-3">
+        <dt class="font-medium text-slate-600">Browser (user agent)</dt>
+        <dd class="mt-1 break-all font-mono text-xs text-slate-700">{optionalApplicantText(record.user_agent)}</dd>
+      </div>
+      <div class="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:justify-between sm:gap-6">
+        <dt class="shrink-0 font-medium text-slate-600">Duplicate submission key</dt>
+        <dd class="min-w-0 break-all text-right font-mono text-xs text-slate-700 sm:text-right">
+          {optionalApplicantText(record.duplicate_key)}
+        </dd>
+      </div>
+      <div class="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:justify-between sm:gap-6">
+        <dt class="shrink-0 font-medium text-slate-600">Record ID</dt>
+        <dd class="min-w-0 break-all text-right font-mono text-xs text-slate-700 sm:text-right">{record.id}</dd>
+      </div>
+    </dl>
+  </section>
 
   <section class="mt-10 max-w-xl">
     <h2 class="text-lg font-semibold text-slate-900">Change status</h2>
@@ -124,17 +274,6 @@ const job = record.expand?.job as { title?: string; slug?: string } | undefined;
       <button type="submit" class="btn-primary btn-sm">Save status</button>
     </form>
   </section>
-
-  <p class="mt-8">
-    <a
-      class="btn-primary btn-sm"
-      href={`/recruiter/applications/${record.id}/cv`}
-      target="_blank"
-      rel="noopener noreferrer"
-    >
-      Download CV
-    </a>
-  </p>
 
   <section class="mt-12 max-w-2xl">
     <h2 class="text-lg font-semibold text-slate-900">Notes</h2>
