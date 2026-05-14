@@ -7,6 +7,7 @@ import {
   findApplicationByDuplicateKey,
   hasSuccessfulConfirmationEmail,
 } from "../../../lib/applications";
+import { normalizeSubmissionIp, resolveIpLocationLabel } from "../../../lib/ip-geolocation";
 import { getPublicPocketBase, getSubmissionServicePocketBase } from "../../../lib/pocketbase";
 import { isRateLimited } from "../../../lib/rate-limit";
 import { sendApplicationReceivedEmail } from "../../../lib/resend";
@@ -117,6 +118,9 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
     const pb = await getSubmissionServicePocketBase();
     const duplicateKey = buildDuplicateKey(validated.data.email, job.id);
 
+    const submissionIp = normalizeSubmissionIp(ipAddress);
+    const submissionIpLocation = (await resolveIpLocationLabel(submissionIp)) ?? "";
+
     let application = null;
     let createdNewApplication = false;
 
@@ -138,6 +142,8 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
       recordData.set("consent_to_store_data", "true");
       recordData.set("source", "website");
       recordData.set("user_agent", (request.headers.get("user-agent") ?? "").slice(0, 500));
+      recordData.set("submission_ip", submissionIp);
+      recordData.set("submission_ip_location", submissionIpLocation);
       recordData.set("submitted_at", new Date().toISOString());
 
       application = await pb.collection("applications").create(recordData);
