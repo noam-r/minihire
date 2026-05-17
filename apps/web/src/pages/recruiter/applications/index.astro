@@ -1,5 +1,18 @@
 ---
+import ApplicationInboxAiScores from "../../../components/recruiter/ApplicationInboxAiScores.astro";
+import WarningTriangleIcon from "../../../components/recruiter/WarningTriangleIcon.astro";
 import RecruiterLayout from "../../../layouts/RecruiterLayout.astro";
+import type { ApplicationRecord } from "../../../lib/applications";
+import {
+  APPLICATION_STATUSES,
+  applicationHasAiLogisticsWarnings,
+  applicationHasAiScores,
+  applicationsListQueryString,
+  buildApplicationsListFilter,
+  buildApplicationsListSort,
+  formatApplicationStatusLabel,
+  parseApplicationsListParams,
+} from "../../../lib/recruiter-applications-list";
 import { recruiterApplicationsIndexErrors } from "../../../lib/recruiter-flash";
 import { formatRelativeTime } from "../../../lib/relative-time";
 import { getCompanyName } from "../../../lib/site";
@@ -10,30 +23,34 @@ const { pb } = Astro.locals.recruiter!;
 const companyName = getCompanyName();
 const now = new Date();
 
+const listParams = parseApplicationsListParams(Astro.url.searchParams);
 const errorCode = Astro.url.searchParams.get("error");
 const errorMsg = errorCode ? recruiterApplicationsIndexErrors[errorCode] : undefined;
-const errorQuery =
-  errorCode && recruiterApplicationsIndexErrors[errorCode]
-    ? `&error=${encodeURIComponent(errorCode)}`
-    : "";
 
 const PER_PAGE = 25;
-const pageRaw = Astro.url.searchParams.get("page");
-const page = Math.max(1, Number.parseInt(pageRaw || "1", 10) || 1);
+const filter = buildApplicationsListFilter(pb, listParams);
+const sort = buildApplicationsListSort(listParams);
 
-const list = await pb.collection("applications").getList(page, PER_PAGE, {
-  sort: "-submitted_at",
-  expand: "job",
-});
+const [list, jobs] = await Promise.all([
+  pb.collection("applications").getList<ApplicationRecord>(listParams.page, PER_PAGE, {
+    sort,
+    expand: "job",
+    ...(filter ? { filter } : {}),
+  }),
+  pb.collection("jobs").getFullList({
+    sort: "title",
+    requestKey: "recruiter_applications_filter_jobs",
+  }),
+]);
 
-if (list.totalPages > 0 && page > list.totalPages) {
-  const qs = new URLSearchParams();
-  qs.set("page", String(list.totalPages));
-  if (errorCode && recruiterApplicationsIndexErrors[errorCode]) {
-    qs.set("error", errorCode);
-  }
-  return Astro.redirect(`/recruiter/applications?${qs}`);
+if (list.totalPages > 0 && listParams.page > list.totalPages) {
+  return Astro.redirect(
+    `/recruiter/applications${applicationsListQueryString({ ...listParams, page: list.totalPages }, errorCode ? { error: errorCode } : {})}`,
+  );
 }
+
+const hasActiveFilters = Boolean(listParams.q || listParams.job || listParams.status);
+const refreshHref = `${Astro.url.pathname}${Astro.url.search}`;
 ---
 
 <RecruiterLayout title={`Applications | ${companyName}`}>
@@ -42,7 +59,12 @@ if (list.totalPages > 0 && page > list.totalPages) {
       <h1 class="text-2xl font-semibold text-slate-900">Applications</h1>
       <p class="mt-1 text-sm text-slate-600">All candidate submissions.</p>
     </div>
-    <a class="btn-secondary btn-sm" href="/recruiter/jobs">View jobs</a>
+    <div class="flex flex-wrap gap-2">
+      <a class="btn-secondary btn-sm no-underline" href={refreshHref} aria-label="Refresh applications list">
+        Refresh
+      </a>
+      <a class="btn-secondary btn-sm no-underline" href="/recruiter/jobs">View jobs</a>
+    </div>
   </div>
 
   {
@@ -51,6 +73,85 @@ if (list.totalPages > 0 && page > list.totalPages) {
     )
   }
 
+  <form class="mt-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm" method="get" action="/recruiter/applications">
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div class="sm:col-span-2">
+        <label class="mb-1 block text-xs font-medium text-slate-600" for="filter-q">Search name or email</label>
+        <input
+          id="filter-q"
+          name="q"
+          type="search"
+          value={listParams.q}
+          placeholder="Search by name or email"
+          class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600"
+        />
+      </div>
+      <div>
+        <label class="mb-1 block text-xs font-medium text-slate-600" for="filter-job">Job</label>
+        <select
+          id="filter-job"
+          name="job"
+          class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600"
+        >
+          <option value="">All jobs</option>
+          {jobs.map((job) => (
+            <option value={job.id} selected={listParams.job === job.id}>
+              {String(job.title ?? job.id)}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label class="mb-1 block text-xs font-medium text-slate-600" for="filter-status">Status</label>
+        <select
+          id="filter-status"
+          name="status"
+          class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600"
+        >
+          <option value="">All statuses</option>
+          {APPLICATION_STATUSES.map((status) => (
+            <option value={status} selected={listParams.status === status}>
+              {formatApplicationStatusLabel(status)}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label class="mb-1 block text-xs font-medium text-slate-600" for="filter-sort">Sort by</label>
+        <select
+          id="filter-sort"
+          name="sort"
+          class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600"
+        >
+          <option value="submitted" selected={listParams.sort === "submitted"}>Submitted date</option>
+          <option value="updated" selected={listParams.sort === "updated"}>Last updated</option>
+          <option value="cv_fit" selected={listParams.sort === "cv_fit"}>CV fit score</option>
+          <option value="required" selected={listParams.sort === "required"}>Required skills score</option>
+          <option value="nice_to_have" selected={listParams.sort === "nice_to_have"}>Nice-to-have score</option>
+        </select>
+      </div>
+      <div>
+        <label class="mb-1 block text-xs font-medium text-slate-600" for="filter-dir">Direction</label>
+        <select
+          id="filter-dir"
+          name="dir"
+          class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600"
+        >
+          <option value="desc" selected={listParams.dir === "desc"}>Descending</option>
+          <option value="asc" selected={listParams.dir === "asc"}>Ascending</option>
+        </select>
+      </div>
+    </div>
+    <div class="mt-4 flex flex-wrap gap-2">
+      <button type="submit" class="btn-primary btn-sm">Apply filters</button>
+      {hasActiveFilters ? (
+        <a class="btn-secondary btn-sm no-underline" href="/recruiter/applications">
+          Clear filters
+        </a>
+      ) : null}
+    </div>
+  </form>
+
   <div class="mt-8 overflow-x-auto rounded-lg border border-slate-200 bg-white">
     <table class="min-w-full divide-y divide-slate-200 text-sm">
       <thead class="bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-600">
@@ -58,7 +159,9 @@ if (list.totalPages > 0 && page > list.totalPages) {
           <th class="px-4 py-3">Candidate</th>
           <th class="px-4 py-3">Job</th>
           <th class="px-4 py-3">Status</th>
+          <th class="px-3 py-3">AI scores</th>
           <th class="px-4 py-3">Submitted</th>
+          <th class="px-4 py-3">Updated</th>
           <th class="px-4 py-3 text-right">Action</th>
         </tr>
       </thead>
@@ -66,24 +169,53 @@ if (list.totalPages > 0 && page > list.totalPages) {
         {
           list.items.length === 0 ? (
             <tr>
-              <td class="px-4 py-6 text-slate-600" colspan="5">
-                No applications yet.
+              <td class="px-4 py-6 text-slate-600" colspan="7">
+                {hasActiveFilters ? "No applications match your filters." : "No applications yet."}
               </td>
             </tr>
           ) : (
             list.items.map((row) => {
               const job = row.expand?.job as { title?: string } | undefined;
+              const evaluated = applicationHasAiScores(row);
+              const hasWarnings = applicationHasAiLogisticsWarnings(row);
+              const updatedAt = row.status_changed_at ?? row.submitted_at;
               return (
                 <tr>
                   <td class="px-4 py-3">
-                    <div class="font-medium text-slate-900">{row.full_name}</div>
-                    <div class="text-xs text-slate-500">{row.email}</div>
+                    <div class="flex items-start gap-1.5">
+                      {
+                        hasWarnings && (
+                          <WarningTriangleIcon
+                            class="mt-0.5 h-4 w-4 shrink-0 text-amber-600"
+                            title="Location or contact details may not match the role"
+                          />
+                        )
+                      }
+                      <div class="min-w-0">
+                        <div class="font-medium text-slate-900">{row.full_name}</div>
+                        <div class="text-xs text-slate-500">{row.email}</div>
+                      </div>
+                    </div>
                   </td>
                   <td class="px-4 py-3 text-slate-700">{job?.title ?? "—"}</td>
-                  <td class="px-4 py-3 text-slate-700">{row.status}</td>
+                  <td class="px-4 py-3 capitalize text-slate-700">{formatApplicationStatusLabel(row.status)}</td>
+                  <td class="px-3 py-3">
+                    <ApplicationInboxAiScores
+                      cvFitScore={row.cv_fit_score}
+                      requiredSkillsScore={row.required_skills_score}
+                      niceToHaveScore={row.nice_to_have_score}
+                      evaluated={evaluated}
+                    />
+                  </td>
                   <td class="px-4 py-3 text-slate-600">
                     <div class="font-medium text-slate-800">{formatRelativeTime(row.submitted_at, now)}</div>
-                    <div class="text-xs text-slate-500">{String(row.submitted_at ?? "").slice(0, 19).replace("T", " ")}</div>
+                    <div class="text-xs text-slate-500">
+                      {String(row.submitted_at ?? "").slice(0, 19).replace("T", " ")}
+                    </div>
+                  </td>
+                  <td class="px-4 py-3 text-slate-600">
+                    <div class="font-medium text-slate-800">{formatRelativeTime(updatedAt, now)}</div>
+                    <div class="text-xs text-slate-500">{String(updatedAt ?? "").slice(0, 19).replace("T", " ")}</div>
                   </td>
                   <td class="px-4 py-3 text-right">
                     <a class="btn-primary btn-sm inline-flex no-underline" href={`/recruiter/applications/${row.id}`}>
@@ -103,8 +235,11 @@ if (list.totalPages > 0 && page > list.totalPages) {
     list.totalPages > 1 && (
       <nav class="mt-6 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-600" aria-label="Applications pagination">
         <div>
-          {page > 1 ? (
-            <a class="text-teal-800 hover:text-teal-900" href={`/recruiter/applications?page=${page - 1}${errorQuery}`}>
+          {listParams.page > 1 ? (
+            <a
+              class="text-teal-800 hover:text-teal-900"
+              href={`/recruiter/applications${applicationsListQueryString({ ...listParams, page: listParams.page - 1 }, errorCode ? { error: errorCode } : {})}`}
+            >
               ← Previous
             </a>
           ) : (
@@ -112,12 +247,15 @@ if (list.totalPages > 0 && page > list.totalPages) {
           )}
         </div>
         <span>
-          Page {page} of {list.totalPages}
+          Page {listParams.page} of {list.totalPages}
           {list.totalItems != null ? ` · ${list.totalItems} total` : ""}
         </span>
         <div>
-          {page < list.totalPages ? (
-            <a class="text-teal-800 hover:text-teal-900" href={`/recruiter/applications?page=${page + 1}${errorQuery}`}>
+          {listParams.page < list.totalPages ? (
+            <a
+              class="text-teal-800 hover:text-teal-900"
+              href={`/recruiter/applications${applicationsListQueryString({ ...listParams, page: listParams.page + 1 }, errorCode ? { error: errorCode } : {})}`}
+            >
               Next →
             </a>
           ) : (

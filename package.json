@@ -10,7 +10,13 @@
     "build": "pnpm --filter web build",
     "preview": "pnpm --filter web preview",
     "lint": "pnpm --filter web lint",
-    "typecheck": "pnpm --filter web typecheck"
+    "typecheck": "pnpm --filter web typecheck",
+    "ai:normalize": "pnpm --filter web ai:normalize",
+    "ai:validate": "pnpm --filter web ai:validate",
+    "ai:evaluate": "pnpm --filter web ai:evaluate",
+    "ai:github": "pnpm --filter web ai:github",
+    "ai:worker": "pnpm --filter web ai:worker",
+    "test": "pnpm --filter web test"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"

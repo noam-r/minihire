@@ -9,6 +9,12 @@ export type ApplicationRecord = RecordModel & {
   email: string;
   status: string;
   duplicate_key: string;
+  submitted_at?: string;
+  status_changed_at?: string;
+  cv_fit_score?: number | null;
+  required_skills_score?: number | null;
+  nice_to_have_score?: number | null;
+  ai_evaluated_at?: string;
 };
 
 export function buildDuplicateKey(email: string, jobId: string): string {

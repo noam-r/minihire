@@ -1,0 +1,267 @@
+---
+import ScoreBar from "./recruiter/ScoreBar.astro";
+import AiCriticalAlerts from "./recruiter/AiCriticalAlerts.astro";
+import {
+  AI_DISCLAIMER,
+  formatJudgement,
+  formatRecommendation,
+  requirementTypeEvaluated,
+  friendlyAiFailure,
+} from "../lib/recruiter-ai/display";
+import {
+  buildEvidenceRationaleView,
+  type EvidenceApplicationContact,
+  type EvidenceJobContext,
+} from "../lib/recruiter-ai/build-evidence-rationale-view";
+import type { RecruiterAiSnapshot } from "../lib/recruiter-ai/load-snapshot";
+import { hasActiveAiRun } from "../lib/recruiter-ai/load-snapshot";
+
+interface Props {
+  applicationId: string;
+  jobId: string;
+  csrf: string;
+  snapshot: RecruiterAiSnapshot;
+  isAdmin: boolean;
+  autoRefresh: boolean;
+  fullDetailHref: string;
+  jobContext?: EvidenceJobContext;
+  contact?: EvidenceApplicationContact;
+}
+
+const {
+  applicationId,
+  jobId,
+  csrf,
+  snapshot,
+  isAdmin,
+  autoRefresh,
+  fullDetailHref,
+  jobContext,
+  contact,
+} = Astro.props;
+
+const runBusy = hasActiveAiRun(snapshot);
+const statusRun = snapshot.activeRun ?? snapshot.latestRun;
+const report = snapshot.latestReport;
+const validation = snapshot.latestValidation;
+const normalization = snapshot.latestNormalization;
+
+const cvFit = report?.cv_fit_score ?? validation?.cv_fit_score;
+const requiredScore = report?.required_skills_score ?? validation?.required_skills_score;
+const niceScore = report?.nice_to_have_score ?? validation?.nice_to_have_score;
+const recommendation = report?.recommendation;
+const requiredEvaluated = requirementTypeEvaluated(snapshot.requirementMatches, "required");
+const niceEvaluated = requirementTypeEvaluated(snapshot.requirementMatches, "nice_to_have");
+
+const rationaleView =
+  snapshot.state === "complete"
+    ? buildEvidenceRationaleView({
+        snapshot,
+        report,
+        validation,
+        normalization,
+        applicationId,
+        jobId,
+        job: jobContext,
+        contact,
+      })
+    : null;
+---
+
+<section class="overflow-hidden rounded-xl border border-violet-200/80 bg-white shadow-sm ring-1 ring-violet-100/60">
+  <header class="border-b border-violet-100 bg-violet-50/50 px-5 py-3">
+    <h2 class="text-sm font-semibold text-slate-900">AI-assisted review</h2>
+    <p class="mt-1 text-xs leading-relaxed text-slate-600">{AI_DISCLAIMER}</p>
+  </header>
+
+  <div class="space-y-4 px-5 py-4 text-sm">
+    {
+      snapshot.state === "not_run" && (
+        <div class="space-y-3">
+          <p class="text-slate-600">
+            No AI evaluation has been run yet. Run a manual evaluation to compare this application with the job
+            requirements.
+          </p>
+          <form method="post" action="/recruiter/actions/run-ai-evaluation">
+            <input type="hidden" name="csrf" value={csrf} />
+            <input type="hidden" name="application_id" value={applicationId} />
+            <button type="submit" class="btn-secondary btn-sm w-full justify-center">Run AI evaluation</button>
+          </form>
+        </div>
+      )
+    }
+
+    {
+      snapshot.state === "in_progress" && (
+        <div class="space-y-3">
+          <p class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-amber-950">
+            AI evaluation is in progress.
+            {autoRefresh
+              ? " This page refreshes every 12 seconds, or reload manually."
+              : " Reload this page to check for results."}
+          </p>
+          <p class="text-xs text-slate-500">
+            Run status: <span class="font-medium text-slate-700">{statusRun?.status}</span>
+            {statusRun?.started_at ? (
+              <span class="text-slate-400">
+                {" "}
+                · started {String(statusRun.started_at).slice(0, 19).replace("T", " ")}
+              </span>
+            ) : null}
+          </p>
+          <form method="post" action="/recruiter/actions/cancel-ai-evaluation">
+            <input type="hidden" name="csrf" value={csrf} />
+            <input type="hidden" name="application_id" value={applicationId} />
+            <button type="submit" class="btn-secondary btn-sm w-full justify-center">
+              Cancel and allow re-run
+            </button>
+          </form>
+        </div>
+      )
+    }
+
+    {
+      (snapshot.state === "failed" || snapshot.state === "skipped") && (
+        <div class="space-y-3">
+          <p class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-red-900">
+            {snapshot.state === "skipped" ? "AI validation skipped" : "AI evaluation failed"}
+          </p>
+          <p class="text-slate-700">
+            {friendlyAiFailure({
+              runError: snapshot.latestRun?.error_message,
+              validationError: validation?.error_message,
+              normalizationError: normalization?.error_message,
+              extractionStatus: normalization?.cv_extraction_status,
+            })}
+          </p>
+          <p class="text-xs text-slate-500">The original CV is still available above. You can review the application manually.</p>
+          {!runBusy && (
+            <form method="post" action="/recruiter/actions/run-ai-evaluation">
+              <input type="hidden" name="csrf" value={csrf} />
+              <input type="hidden" name="application_id" value={applicationId} />
+              <button type="submit" class="btn-secondary btn-sm w-full justify-center">Re-run AI evaluation</button>
+            </form>
+          )}
+        </div>
+      )
+    }
+
+    {
+      snapshot.state === "complete" && (
+        <div class="space-y-4">
+          {
+            snapshot.hasQueuedRun && (
+              <p class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+                Another evaluation is queued. Results below are from the last completed run. Process the queue with{" "}
+                <span class="font-mono">pnpm ai:worker -- --once</span>, or cancel the queued run.
+              </p>
+            )
+          }
+
+          {rationaleView && rationaleView.criticalFindings.length > 0 && (
+            <AiCriticalAlerts findings={rationaleView.criticalFindings} maxVisible={2} />
+          )}
+
+          <p class="text-[11px] text-slate-500">Scores are on a 0–5 scale.</p>
+          <dl class="mt-2 space-y-3">
+            <ScoreBar label="CV fit" value={cvFit} evaluated={cvFit != null} />
+            <ScoreBar label="Required skills" value={requiredScore} evaluated={requiredEvaluated} />
+            <ScoreBar label="Nice-to-have" value={niceScore} evaluated={niceEvaluated} />
+          </dl>
+
+          {recommendation && (
+            <p class="text-xs text-slate-600">
+              Suggested label:{" "}
+              <span class="font-medium text-slate-800">{formatRecommendation(recommendation)}</span>
+              <span class="text-slate-400"> (advisory only)</span>
+              {
+                rationaleView?.verdictOneLiner && (
+                  <span class="mt-1 block leading-relaxed text-slate-600">{rationaleView.verdictOneLiner}</span>
+                )
+              }
+            </p>
+          )}
+
+          <p class="text-[11px] text-slate-500">
+            <a class="text-teal-800 hover:text-teal-900" href={fullDetailHref}>
+              View full AI evaluation evidence
+            </a>
+            {" "}for requirement-level reasoning and score details.
+          </p>
+
+          {snapshot.requirementMatches.length > 0 && (
+            <details class="text-xs text-slate-600">
+              <summary class="cursor-pointer font-medium text-slate-700">
+                Requirements preview ({Math.min(6, snapshot.requirementMatches.length)} of{" "}
+                {snapshot.requirementMatches.length})
+              </summary>
+              <div class="mt-2 max-h-40 overflow-y-auto rounded-md border border-slate-100">
+                <table class="w-full text-left text-[11px]">
+                  <thead class="sticky top-0 bg-slate-50 text-slate-500">
+                    <tr>
+                      <th class="px-2 py-1 font-medium">Requirement</th>
+                      <th class="px-2 py-1 font-medium">Judgement</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {snapshot.requirementMatches.slice(0, 6).map((m) => (
+                      <tr class="border-t border-slate-100">
+                        <td class="px-2 py-1 text-slate-800">{m.requirement}</td>
+                        <td class="px-2 py-1 text-slate-600">{formatJudgement(m.judgement)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </details>
+          )}
+
+          <div class="flex flex-col gap-2 border-t border-slate-100 pt-3">
+            <a class="btn-secondary btn-sm w-full justify-center text-center" href={fullDetailHref}>
+              View full AI evidence
+            </a>
+            {!runBusy && (
+              <form method="post" action="/recruiter/actions/run-ai-evaluation">
+                <input type="hidden" name="csrf" value={csrf} />
+                <input type="hidden" name="application_id" value={applicationId} />
+                <button type="submit" class="btn-secondary btn-sm w-full justify-center">Re-run AI evaluation</button>
+              </form>
+            )}
+          </div>
+        </div>
+      )
+    }
+
+    {
+      isAdmin && snapshot.latestRun && (
+        <details class="border-t border-slate-100 pt-3 text-xs text-slate-600">
+          <summary class="cursor-pointer font-medium text-slate-700">Technical details</summary>
+          <dl class="mt-2 space-y-1 font-mono text-[11px]">
+            <div>
+              <dt class="inline text-slate-500">run </dt>
+              <dd class="inline text-slate-800">{snapshot.latestRun.id}</dd>
+            </div>
+            {validation?.model && (
+              <div>
+                <dt class="inline text-slate-500">model </dt>
+                <dd class="inline text-slate-800">{validation.model}</dd>
+              </div>
+            )}
+            {validation?.prompt_version && (
+              <div>
+                <dt class="inline text-slate-500">prompt </dt>
+                <dd class="inline text-slate-800">{validation.prompt_version}</dd>
+              </div>
+            )}
+            {validation?.scoring_version && (
+              <div>
+                <dt class="inline text-slate-500">scoring </dt>
+                <dd class="inline text-slate-800">{validation.scoring_version}</dd>
+              </div>
+            )}
+          </dl>
+        </details>
+      )
+    }
+  </div>
+</section>

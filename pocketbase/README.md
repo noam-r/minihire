@@ -41,6 +41,8 @@ Hooks under [`pb_hooks/`](./pb_hooks/) enforce that portal users cannot overwrit
 
 Migration `1747066100_jobs_admin_portal_update` sets **`jobs.updateRule`** so PocketBase **`users`** with **`role = admin`** (and `active`) may update job records from the Astro recruiter portal; **`recruiter`** role and **`submission_service`** do not receive update access via rules.
 
+Migration `1747066600_ai_evaluation_collections` adds AI collections (`application_normalizations`, `application_ai_validations`, `application_github_evidence`, `application_ai_runs`, `application_ai_evaluation_reports`). Recruiters may **read** and **create** runs (`started_by` must match); **`submission_service`** creates/updates pipeline artifacts and run status.
+
 ### Docker / production data directory
 
 When PocketBase runs with **`--dir=/pb_data`** (as in the production container), every CLI command that mutates data must use the same **`--dir`**, for example:

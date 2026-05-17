@@ -1,0 +1,40 @@
+---
+import {
+  formatConfidence,
+  formatRecommendation,
+} from "../../lib/recruiter-ai/display";
+import type { EvidenceRationaleView } from "../../lib/recruiter-ai/build-evidence-rationale-view";
+
+interface Props {
+  rationale: EvidenceRationaleView;
+}
+
+const { rationale } = Astro.props;
+---
+
+<div class="mt-5 space-y-2 border-t border-slate-100 pt-5">
+  <p class="text-sm text-slate-800">
+    {
+      rationale.recommendation ? (
+        <>
+          <span class="font-medium">{formatRecommendation(rationale.recommendation)}</span>
+          <span class="text-slate-500"> (advisory)</span>
+          <span class="text-slate-400"> · </span>
+        </>
+      ) : null
+    }
+  <span class="text-slate-600">
+      Confidence: <span class="font-medium text-slate-800">{formatConfidence(rationale.confidence)}</span>
+    </span>
+  </p>
+  {
+    rationale.verdictOneLiner && (
+      <p class="text-sm leading-relaxed text-slate-600">{rationale.verdictOneLiner}</p>
+    )
+  }
+  <p class="text-xs text-slate-500">
+    <a class="text-teal-800 hover:text-teal-900" href="#ai-assessment-details">
+      View assessment reasoning
+    </a>
+  </p>
+</div>

@@ -1,0 +1,153 @@
+---
+import {
+  formatConfidence,
+  formatRecommendation,
+} from "../../lib/recruiter-ai/display";
+import type { EvidenceRationaleView } from "../../lib/recruiter-ai/build-evidence-rationale-view";
+
+interface Props {
+  rationale: EvidenceRationaleView;
+}
+
+const { rationale } = Astro.props;
+
+const hasKeyFactors =
+  rationale.strengths.length > 0 ||
+  rationale.gaps.length > 0 ||
+  rationale.concerns.length > 0 ||
+  rationale.secondaryConcerns.length > 0;
+
+const hasReasoning =
+  rationale.recruiterSummary ||
+  rationale.confidenceRationale ||
+  rationale.recommendationExplanation;
+---
+
+<div id="ai-assessment-details" class="mt-5 space-y-3 border-t border-slate-100 pt-5">
+  {
+    hasReasoning && (
+      <details class="group rounded-md border border-slate-100 bg-slate-50/50">
+        <summary class="cursor-pointer px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+          Assessment reasoning
+        </summary>
+        <div class="space-y-4 border-t border-slate-100 px-3 py-3 text-sm text-slate-700">
+          {
+            rationale.recruiterSummary && (
+              <div>
+                <h4 class="text-xs font-medium text-slate-500">Overall assessment</h4>
+                <p class="mt-1 leading-relaxed">{rationale.recruiterSummary}</p>
+              </div>
+            )
+          }
+          <div>
+            <h4 class="text-xs font-medium text-slate-500">Confidence</h4>
+            <p class="mt-1 font-medium text-slate-900">{formatConfidence(rationale.confidence)}</p>
+            {
+              rationale.confidenceRationale ? (
+                <p class="mt-1 leading-relaxed text-slate-600">{rationale.confidenceRationale}</p>
+              ) : (
+                <p class="mt-1 italic text-slate-500">
+                  Not available for this run—re-run AI evaluation to see confidence reasoning.
+                </p>
+              )
+            }
+          </div>
+          {
+            rationale.recommendation && (
+              <div>
+                <h4 class="text-xs font-medium text-slate-500">Advisory label</h4>
+                <p class="mt-1 font-medium text-slate-900">
+                  {formatRecommendation(rationale.recommendation)}
+                  <span class="font-normal text-slate-500"> (advisory only)</span>
+                </p>
+                {
+                  rationale.recommendationExplanation && (
+                    <p class="mt-1 leading-relaxed text-slate-600">{rationale.recommendationExplanation}</p>
+                  )
+                }
+              </div>
+            )
+          }
+        </div>
+      </details>
+    )
+  }
+
+  {
+    rationale.scoreBullets.length > 0 && (
+      <details class="group rounded-md border border-slate-100 bg-slate-50/50">
+        <summary class="cursor-pointer px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+          How scores were calculated
+        </summary>
+        <ul class="list-disc space-y-1.5 border-t border-slate-100 px-3 py-3 pl-7 text-sm text-slate-600">
+          {rationale.scoreBullets.map((line) => (
+            <li>{line}</li>
+          ))}
+        </ul>
+      </details>
+    )
+  }
+
+  {
+    hasKeyFactors && (
+      <details class="group rounded-md border border-slate-100 bg-slate-50/50">
+        <summary class="cursor-pointer px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+          Strengths, gaps & concerns
+        </summary>
+        <div class="grid gap-4 border-t border-slate-100 px-3 py-3 sm:grid-cols-3">
+          {
+            rationale.strengths.length > 0 && (
+              <div>
+                <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-500">Strengths</h4>
+                <ul class="mt-2 list-disc space-y-1 pl-4 text-sm text-slate-700">
+                  {rationale.strengths.map((item) => (
+                    <li>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            )
+          }
+          {
+            rationale.gaps.length > 0 && (
+              <div>
+                <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-500">Gaps</h4>
+                <ul class="mt-2 list-disc space-y-1 pl-4 text-sm text-slate-700">
+                  {rationale.gaps.map((item) => (
+                    <li>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            )
+          }
+          {
+            (rationale.concerns.length > 0 || rationale.secondaryConcerns.length > 0) && (
+              <div>
+                <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-500">Concerns</h4>
+                <ul class="mt-2 list-disc space-y-1 pl-4 text-sm text-slate-700">
+                  {[...rationale.concerns, ...rationale.secondaryConcerns].map((item) => (
+                    <li>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            )
+          }
+        </div>
+      </details>
+    )
+  }
+
+  {
+    rationale.flagLabels.length > 0 && (
+      <details class="group rounded-md border border-slate-100 bg-slate-50/50">
+        <summary class="cursor-pointer px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+          Assessment flags
+        </summary>
+        <ul class="list-disc space-y-1 border-t border-slate-100 px-3 py-3 pl-7 text-sm text-slate-600">
+          {rationale.flagLabels.map((label) => (
+            <li>{label}</li>
+          ))}
+        </ul>
+      </details>
+    )
+  }
+</div>

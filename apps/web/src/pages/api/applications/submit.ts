@@ -135,7 +135,9 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
       recordData.set("user_agent", (request.headers.get("user-agent") ?? "").slice(0, 500));
       recordData.set("submission_ip", submissionIp);
       recordData.set("submission_ip_location", submissionIpLocation);
-      recordData.set("submitted_at", new Date().toISOString());
+      const submittedAt = new Date().toISOString();
+      recordData.set("submitted_at", submittedAt);
+      recordData.set("status_changed_at", submittedAt);
 
       application = await pb.collection("applications").create(recordData);
       createdNewApplication = true;

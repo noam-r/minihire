@@ -14,7 +14,11 @@ export function runtimeEnv(name: string): string | undefined {
     }
   }
 
-  const fromMeta = (import.meta.env as unknown as Record<string, string | undefined>)[name];
+  const meta =
+    typeof import.meta !== "undefined"
+      ? (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env
+      : undefined;
+  const fromMeta = meta?.[name];
   if (typeof fromMeta === "string" && fromMeta.trim() !== "") {
     return fromMeta.trim();
   }

@@ -1,0 +1,26 @@
+---
+import ScoreBarCompact from "./ScoreBarCompact.astro";
+
+interface Props {
+  cvFitScore?: number | null;
+  requiredSkillsScore?: number | null;
+  niceToHaveScore?: number | null;
+  evaluated?: boolean;
+}
+
+const { cvFitScore, requiredSkillsScore, niceToHaveScore, evaluated = false } = Astro.props;
+---
+
+{
+  evaluated ? (
+    <div class="min-w-[9.5rem] max-w-[11rem] space-y-1.5 py-0.5">
+      <ScoreBarCompact label="CV fit" shortLabel="CV" value={cvFitScore} evaluated />
+      <ScoreBarCompact label="Required skills" shortLabel="Fit" value={requiredSkillsScore} evaluated />
+      <ScoreBarCompact label="Nice-to-have" shortLabel="Nice" value={niceToHaveScore} evaluated />
+    </div>
+  ) : (
+    <p class="py-1 text-xs font-medium text-slate-500" title="No AI evaluation has been run for this application">
+      Not evaluated
+    </p>
+  )
+}

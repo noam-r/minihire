@@ -1,6 +1,7 @@
 import type { APIRoute } from "astro";
 import { ClientResponseError } from "pocketbase";
 
+import { syncApplicationStatusChangedAt } from "../../../lib/ai/pipeline/store-artifacts";
 import { isApplicationStatus } from "../../../lib/application-statuses";
 import { verifySessionCsrf } from "../../../lib/recruiter-auth/csrf";
 
@@ -65,6 +66,12 @@ export const POST: APIRoute = async (context) => {
     });
   } catch (error) {
     console.error("application_status_history create:", error);
+  }
+
+  try {
+    await syncApplicationStatusChangedAt(pb, applicationId);
+  } catch (error) {
+    console.error("application status_changed_at sync:", error);
   }
 
   return redirect(`/recruiter/applications/${applicationId}?updated=1`, 303);

@@ -139,6 +139,25 @@ Hiring staff use the **recruiter portal** at **`/recruiter`** on the same origin
 
 From the portal you can review applications (paginated list), open a candidate (status changes, internal notes, CV download through the app), and **admins** can edit jobs (title, slug, summary, description, status, optional published date) on each job’s recruiter page after migration `1747066100_jobs_admin_portal_update`. **`email_logs`** are not shown in the portal (v1). Recruiters without the **admin** role see jobs read-only in the portal; job **creation** and **deletion** remain in PocketBase Admin (superuser or future rules).
 
+### AI-assisted evaluation (optional)
+
+Migration `1747066600_ai_evaluation_collections` adds PocketBase collections for CV normalization, LLM validation, evaluation reports, and async run tracking. Design docs: [`tmp/minihire-ai-docs/`](tmp/minihire-ai-docs/).
+
+1. Set in `.env` (see [`.env.example`](.env.example)): `AI_ENABLED=true`, `AI_PROVIDER` (`openai` or `anthropic`), `AI_API_KEY`, `AI_MODEL`, and optionally `AI_CLI_STARTED_BY_USER_ID` for CLI audit.
+2. On an application detail page, use **Run AI evaluation** in the Review sidebar (queues a run; does not block the browser).
+3. Run the worker so queued runs complete (uses `submission_service`, same as the apply API):
+
+   ```bash
+   pnpm ai:worker -- --once          # one batch
+   ./scripts/run-ai-worker.sh        # same, for cron/systemd
+   ```
+
+   In production, schedule `run-ai-worker.sh` every 1–2 minutes (cron or a supervisor). The `web` container must reach your LLM provider API over HTTPS.
+
+4. CLI (ops / debugging): `pnpm ai:normalize`, `pnpm ai:validate`, `pnpm ai:evaluate -- --application <id> --started-by <users-id>`.
+
+Recruiters see scores and evidence on the application page; full tables live at `/recruiter/applications/<id>/ai`. GitHub evidence (Phase 3) is not implemented yet.
+
 ## PocketBase Notes
 
 - `jobs` is public **list/view** for **published** roles only. Authenticated portal users (`users` with `role` + `active`) can list and view jobs in any status per migration rules.

@@ -1,0 +1,53 @@
+---
+import { AI_SCORE_MAX, scorePercent } from "../../lib/ai/shared/score-scale";
+
+interface Props {
+  label: string;
+  value?: number | null;
+  /** When false, show "Not evaluated" instead of a zero score. */
+  evaluated?: boolean;
+  detail?: string;
+  class?: string;
+}
+
+const { label, value, evaluated = true, detail, class: className = "" } = Astro.props;
+
+const showBar = evaluated && value != null && !Number.isNaN(value);
+const displayValue = showBar ? value! : null;
+const percent = displayValue != null ? scorePercent(displayValue) : 0;
+---
+
+<div class:list={["space-y-1.5", className]}>
+  <div class="flex items-baseline justify-between gap-2">
+    <dt class="text-xs font-medium text-slate-600">{label}</dt>
+    <dd class="text-sm font-semibold tabular-nums text-slate-900">
+      {
+        showBar ? (
+          <>
+            {displayValue!.toFixed(1)}
+            <span class="text-xs font-normal text-slate-500"> / {AI_SCORE_MAX}</span>
+          </>
+        ) : (
+          <span class="text-xs font-medium text-slate-500">Not evaluated</span>
+        )
+      }
+    </dd>
+  </div>
+  {
+    showBar ? (
+      <div
+        class="h-2 overflow-hidden rounded-full bg-slate-200"
+        role="meter"
+        aria-valuenow={displayValue!}
+        aria-valuemin={0}
+        aria-valuemax={AI_SCORE_MAX}
+        aria-label={`${label}: ${displayValue!.toFixed(1)} out of ${AI_SCORE_MAX}`}
+      >
+        <div class="h-full rounded-full bg-violet-500" style={`width: ${percent}%`} />
+      </div>
+    ) : (
+      <div class="h-2 rounded-full bg-slate-100" aria-hidden="true" />
+    )
+  }
+  {detail ? <p class="text-[11px] text-slate-500">{detail}</p> : null}
+</div>

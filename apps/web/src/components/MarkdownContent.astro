@@ -1,5 +1,5 @@
 ---
-import MarkdownIt from "markdown-it";
+import { renderReportMarkdownHtml } from "../lib/markdown-report";
 
 interface Props {
   content: string;
@@ -8,13 +8,7 @@ interface Props {
 
 const { content, class: className = "" } = Astro.props;
 
-const md = new MarkdownIt({
-  html: false,
-  linkify: true,
-  typographer: true,
-});
-
-const rendered = md.render(content);
+const rendered = renderReportMarkdownHtml(content);
 ---
 
 <div class:list={["prose-jobs text-base leading-7 text-slate-700", className]} set:html={rendered} />

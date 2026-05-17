@@ -1,6 +1,13 @@
 ---
+import RecruiterAiPanel from "../../../components/RecruiterAiPanel.astro";
 import RecruiterLayout from "../../../layouts/RecruiterLayout.astro";
+import type { JobRecord } from "../../../lib/ai/pocketbase";
+import {
+  contactFromApplication,
+  jobContextFromRecord,
+} from "../../../lib/recruiter-ai/build-evidence-rationale-view";
 import { APPLICATION_STATUSES } from "../../../lib/application-statuses";
+import { loadRecruiterAiSnapshot } from "../../../lib/recruiter-ai/load-snapshot";
 import {
   cvFilename,
   formatConsent,
@@ -24,7 +31,7 @@ if (!id) {
   return Astro.redirect("/recruiter/applications");
 }
 
-const { pb } = Astro.locals.recruiter!;
+const { pb, user } = Astro.locals.recruiter!;
 const csrf = ensureSessionCsrfCookie(Astro.cookies);
 const companyName = getCompanyName();
 const now = new Date();
@@ -32,6 +39,7 @@ const now = new Date();
 const flash = {
   updated: Astro.url.searchParams.get("updated") === "1",
   note: Astro.url.searchParams.get("note") === "1",
+  aiRequested: Astro.url.searchParams.get("ai_requested") === "1",
   error: Astro.url.searchParams.get("error"),
 };
 
@@ -71,17 +79,29 @@ const [notesRaw, historyRaw] = await Promise.all([
 const notes = [...notesRaw].sort(compareByCreatedThenId);
 const history = [...historyRaw].sort((a, b) => compareByCreatedThenId(b, a));
 
-const job = record.expand?.job as { id?: string; title?: string; slug?: string } | undefined;
+const expandedJob = record.expand?.job as JobRecord | undefined;
+const job = expandedJob as { id?: string; title?: string; slug?: string } | undefined;
 const jobId = String(record.job ?? job?.id ?? "");
+const aiJobContext = expandedJob ? jobContextFromRecord(expandedJob) : undefined;
+const aiContact = contactFromApplication({
+  location: String(record.location ?? ""),
+  timezone: String(record.timezone ?? ""),
+  phone_number: String(record.phone_number ?? ""),
+});
 const jobTitle = trimStr(job?.title) !== "" ? trimStr(job?.title) : jobId !== "" ? "Job listing" : "Application";
 const jobHref = jobId !== "" ? `/recruiter/jobs/${jobId}` : undefined;
 
 const githubUrl = optionalApplicantUrl(record.github_url);
 const portfolioUrl = optionalApplicantUrl(record.portfolio_url);
 const linkedinUrl = optionalApplicantUrl(record.linkedin_url);
+
+const aiSnapshot = await loadRecruiterAiSnapshot(pb, id);
+const aiAutoRefresh = aiSnapshot.state === "in_progress";
+const aiFullDetailHref = `/recruiter/applications/${id}/ai`;
 ---
 
 <RecruiterLayout title={`${record.full_name} | ${companyName}`}>
+  {aiAutoRefresh && <meta slot="head" http-equiv="refresh" content="12" />}
   <div class="mb-6 border-b border-slate-200 pb-6">
     <p class="text-sm text-slate-600">
       <a class="text-teal-800 hover:text-teal-900" href="/recruiter/applications">← Applications</a>
@@ -119,6 +139,13 @@ const linkedinUrl = optionalApplicantUrl(record.linkedin_url);
   {
     flash.note && (
       <p class="mb-6 rounded-md border border-teal-200 bg-teal-50 px-3 py-2 text-sm text-teal-900">Note added.</p>
+    )
+  }
+  {
+    flash.aiRequested && (
+      <p class="mb-6 rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-sm text-violet-950">
+        AI evaluation queued. Results appear here when processing finishes (reload or wait for auto-refresh).
+      </p>
     )
   }
   {
@@ -338,6 +365,18 @@ const linkedinUrl = optionalApplicantUrl(record.linkedin_url);
           </div>
         </div>
       </section>
+
+      <RecruiterAiPanel
+        applicationId={record.id}
+        jobId={typeof record.job === "string" ? record.job : String(record.job ?? "")}
+        csrf={csrf}
+        snapshot={aiSnapshot}
+        isAdmin={user.role === "admin"}
+        autoRefresh={aiAutoRefresh}
+        fullDetailHref={aiFullDetailHref}
+        jobContext={aiJobContext}
+        contact={aiContact}
+      />
 
       <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <header class="border-b border-slate-100 px-5 py-3">

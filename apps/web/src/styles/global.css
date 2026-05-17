@@ -87,25 +87,80 @@ button.btn-secondary {
 .prose-jobs h1,
 .prose-jobs h2,
 .prose-jobs h3,
-.prose-jobs h4 {
+.prose-jobs h4,
+.prose-ai-report h1,
+.prose-ai-report h2,
+.prose-ai-report h3,
+.prose-ai-report h4 {
   margin-top: 1.5rem;
   margin-bottom: 0.75rem;
   line-height: 1.25;
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.prose-jobs h1,
+.prose-ai-report h1 {
+  font-size: 1.5rem;
+  margin-top: 0;
+}
+
+.prose-jobs h2,
+.prose-ai-report h2 {
+  font-size: 1.25rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.prose-jobs h3,
+.prose-ai-report h3 {
+  font-size: 1.0625rem;
+}
+
+.prose-jobs h4,
+.prose-ai-report h4 {
+  font-size: 0.9375rem;
 }
 
 .prose-jobs p,
 .prose-jobs ul,
-.prose-jobs ol {
+.prose-jobs ol,
+.prose-ai-report p,
+.prose-ai-report ul,
+.prose-ai-report ol {
   margin-top: 0;
   margin-bottom: 1rem;
 }
 
 .prose-jobs ul,
-.prose-jobs ol {
+.prose-jobs ol,
+.prose-ai-report ul,
+.prose-ai-report ol {
   padding-left: 1.5rem;
 }
 
-.prose-jobs code {
+.prose-ai-report table {
+  width: 100%;
+  margin: 1rem 0;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.prose-ai-report th,
+.prose-ai-report td {
+  border: 1px solid #e2e8f0;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+}
+
+.prose-ai-report th {
+  background: #f8fafc;
+  font-weight: 600;
+  color: #475569;
+}
+
+.prose-jobs code,
+.prose-ai-report code {
   background: #e2e8f0;
   border-radius: 0.25rem;
   padding: 0.125rem 0.375rem;

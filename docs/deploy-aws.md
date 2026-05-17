@@ -21,7 +21,7 @@ Ensure your origin is reached **only** via the CDN so clients cannot spoof `CF-C
 
 When a candidate applies, the **`web` container** resolves an approximate city/region/country by calling **outbound HTTPS** to **GeoJS** (`https://get.geojs.io/v1/ip/geo/<ip>.json`, no API key). If **Approximate location (from IP)** is empty but the stored IP looks like a normal public address:
 
-- **Egress:** Ensure the instance / VPC allows **HTTPS outbound** (TCP 443) from the `web` service to the internet (e.g. `get.geojs.io`). A locked-down default-deny egress rule will cause timeouts and an empty location.
+- **Egress:** Ensure the instance / VPC allows **HTTPS outbound** (TCP 443) from the `web` service to the internet (e.g. `get.geojs.io`, and your LLM provider API when `AI_ENABLED=true`). A locked-down default-deny egress rule will cause timeouts and an empty location.
 - **Logs:** Search web container logs for **`[submission-ip-geolocation]`** (timeouts, non-JSON responses, HTTP errors, or empty location fields in the response).
 - **Duplicate applications:** If the same person applies again to the same job (same duplicate key), the app reuses the existing application row and **does not** re-run geolocation; an empty location from the first create will stay empty until you edit the record or they get a new application row.
 
@@ -158,7 +158,17 @@ docker compose -f docker/docker-compose.prod.yml --env-file .env exec pocketbase
   ./pocketbase superuser upsert admin@example.com 'REPLACE_WITH_A_STRONG_PASSWORD' --dir=/pb_data
 ```
 
-## 7. Backups
+## 7. AI evaluation worker (optional)
+
+When `AI_ENABLED=true`, recruiters queue runs from the portal; a **worker** must process `application_ai_runs` with `status = requested`. On the host (not inside the ephemeral web container unless you add a sidecar), schedule:
+
+```bash
+*/2 * * * * cd /opt/minihire/repo && ./scripts/run-ai-worker.sh >> /var/log/minihire-ai-worker.log 2>&1
+```
+
+The worker uses `POCKETBASE_SUBMISSION_SERVICE_*` from `.env` and needs outbound HTTPS to your LLM provider. Set `AI_*` in the same `.env` loaded by Compose for the **web** service (runtime `env_file`).
+
+## 8. Backups
 
 [`scripts/backup.sh`](../scripts/backup.sh) can back up from a **host path** (`POCKETBASE_DATA_DIR`) or from a **running PocketBase container** (`POCKETBASE_DOCKER_CONTAINER=minihire-pocketbase`). With Docker **named volumes** and no bind mount, use the container mode (rebuild the PocketBase image once so it includes `sqlite3`; see `docker/Dockerfile.pocketbase`). Alternatively archive `/pb_data` with `tar` via `docker compose exec` (Option A below).
 
@@ -189,11 +199,11 @@ aws s3 cp "/tmp/pb-backup-$(date +%Y%m%d%H%M).tar.gz" s3://your-bucket/minihire/
 
 Add an S3 lifecycle rule to expire old objects after N days.
 
-## 8. Restore
+## 9. Restore
 
 Stop the stack, restore files into the PocketBase data directory (or volume), then start again. See the Restore section in [README.md](../README.md).
 
-## 9. Local smoke test (optional)
+## 10. Local smoke test (optional)
 
 When port **80** is already in use on your laptop, use the high-port override:
 
@@ -209,7 +219,7 @@ Validate compose files without starting containers:
 SITE_HOST=127.0.0.1 docker-compose -f docker/docker-compose.prod.yml -f docker/docker-compose.smoketest.yml --env-file .env.example config
 ```
 
-## 10. Secrets hygiene
+## 11. Secrets hygiene
 
 - Do not commit `.env`.
 - Prefer **AWS Systems Manager Parameter Store** (`SecureString`) or **Secrets Manager** and a small entrypoint script to materialize `.env` at boot, or use `environment` from SSM in a wrapper (advanced).

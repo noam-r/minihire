@@ -41,6 +41,7 @@ function navClass(href: string): string {
     <meta name="generator" content={Astro.generator} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>{title}</title>
+    <slot name="head" />
   </head>
   <body class="bg-slate-50 text-slate-900">
     <div class="min-h-screen">

@@ -10,6 +10,7 @@ export const recruiterApplicationDetailErrors: Record<string, string> = {
   status: "Status could not be updated.",
   note: "Notes must be between 1 and 8,000 characters.",
   note_save: "The note could not be saved.",
+  ai_run: "Could not queue AI evaluation. An evaluation may already be in progress.",
 };
 
 /** `?error=` codes on `/recruiter/jobs` (list). */

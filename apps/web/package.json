@@ -11,24 +11,36 @@
     "preview": "astro preview",
     "lint": "astro check",
     "typecheck": "astro check",
-    "astro": "astro"
+    "astro": "astro",
+    "ai:normalize": "tsx scripts/ai-normalize.ts",
+    "ai:validate": "tsx scripts/ai-validate.ts",
+    "ai:evaluate": "tsx scripts/ai-evaluate.ts",
+    "ai:github": "tsx scripts/ai-github.ts",
+    "ai:worker": "tsx scripts/ai-worker.ts",
+    "test": "node --import tsx --test 'src/lib/ai/**/*.test.ts' 'src/lib/recruiter-ai/**/*.test.ts' 'src/lib/recruiter-applications-list.test.ts'",
+    "backfill:application-list-fields": "tsx scripts/backfill-application-list-fields.ts"
   },
   "dependencies": {
     "@astrojs/node": "^9.5.5",
     "@tailwindcss/vite": "^4.3.0",
     "astro": "^5.18.1",
     "markdown-it": "^14.1.1",
+    "markdown-it-table": "^4.1.1",
+    "pdfkit": "^0.18.0",
     "pocketbase": "^0.26.9",
     "resend": "^6.12.3",
     "tailwindcss": "^4.3.0",
+    "unpdf": "^1.6.2",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.9",
     "@types/markdown-it": "^14.1.2",
     "@types/node": "^25.7.0",
+    "@types/pdfkit": "^0.17.6",
     "eslint": "^10.3.0",
     "eslint-plugin-astro": "^1.7.0",
+    "tsx": "^4.22.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.59.3"
   }

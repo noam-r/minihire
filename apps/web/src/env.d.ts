@@ -13,6 +13,15 @@ interface ImportMetaEnv {
   readonly APPLICATION_EMAIL_SIGN_OFF?: string;
   readonly MAX_CV_SIZE_BYTES?: string;
   readonly FORM_SIGNING_SECRET?: string;
+  readonly AI_ENABLED?: string;
+  readonly AI_PROVIDER?: string;
+  readonly AI_API_KEY?: string;
+  readonly AI_MODEL?: string;
+  readonly AI_MAX_CV_CHARS?: string;
+  readonly AI_CLI_STARTED_BY_USER_ID?: string;
+  readonly GITHUB_TOKEN?: string;
+  readonly GITHUB_MAX_REPOS?: string;
+  readonly GITHUB_MAX_COMMITS_PER_REPO?: string;
 }
 
 interface ImportMeta {

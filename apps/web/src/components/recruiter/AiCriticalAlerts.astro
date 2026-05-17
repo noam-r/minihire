@@ -1,0 +1,40 @@
+---
+import type { LogisticsFinding } from "../../lib/ai/validation/assess-application-logistics";
+
+interface Props {
+  findings: LogisticsFinding[];
+  maxVisible?: number;
+}
+
+const { findings, maxVisible = 5 } = Astro.props;
+const visible = findings.slice(0, maxVisible);
+
+function alertClasses(severity: LogisticsFinding["severity"]): string {
+  if (severity === "deal_breaker") {
+    return "border-red-300 bg-red-50 text-red-950";
+  }
+  if (severity === "warning") {
+    return "border-amber-300 bg-amber-50 text-amber-950";
+  }
+  return "border-slate-200 bg-slate-50 text-slate-800";
+}
+
+function titleClasses(severity: LogisticsFinding["severity"]): string {
+  if (severity === "deal_breaker") return "text-red-900";
+  if (severity === "warning") return "text-amber-900";
+  return "text-slate-900";
+}
+---
+
+{
+  visible.length > 0 && (
+    <div class="space-y-2" role="alert" aria-live="polite">
+      {visible.map((finding) => (
+        <article class:list={["rounded-lg border px-4 py-3", alertClasses(finding.severity)]}>
+          <h3 class:list={["text-sm font-semibold", titleClasses(finding.severity)]}>{finding.title}</h3>
+          <p class="mt-1 text-sm leading-relaxed">{finding.detail}</p>
+        </article>
+      ))}
+    </div>
+  )
+}

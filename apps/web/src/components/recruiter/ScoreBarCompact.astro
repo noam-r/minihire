@@ -1,0 +1,55 @@
+---
+import { AI_SCORE_MAX, scorePercent } from "../../lib/ai/shared/score-scale";
+
+interface Props {
+  label: string;
+  shortLabel: string;
+  value?: number | null;
+  evaluated?: boolean;
+  class?: string;
+}
+
+const { label, shortLabel, value, evaluated = true, class: className = "" } = Astro.props;
+
+const showBar = evaluated && value != null && !Number.isNaN(value);
+const displayValue = showBar ? value! : null;
+const percent = displayValue != null ? scorePercent(displayValue) : 0;
+---
+
+<div class:list={["flex items-center gap-2", className]}>
+  <span
+    class="w-7 shrink-0 text-[10px] font-semibold uppercase tracking-wide text-slate-500"
+    title={label}
+    aria-hidden="true"
+  >
+    {shortLabel}
+  </span>
+  <div
+    class="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-200"
+    role={showBar ? "meter" : undefined}
+    aria-valuenow={showBar ? displayValue! : undefined}
+    aria-valuemin={showBar ? 0 : undefined}
+    aria-valuemax={showBar ? AI_SCORE_MAX : undefined}
+    aria-label={showBar ? `${label}: ${displayValue!.toFixed(1)} out of ${AI_SCORE_MAX}` : `${label}: not evaluated`}
+  >
+    {
+      showBar ? (
+        <div class="h-full rounded-full bg-violet-500" style={`width: ${percent}%`} />
+      ) : (
+        <div class="h-full rounded-full bg-slate-100" aria-hidden="true" />
+      )
+    }
+  </div>
+  <span class="w-9 shrink-0 text-right text-xs font-semibold tabular-nums text-slate-900">
+    {
+      showBar ? (
+        <>
+          {displayValue!.toFixed(1)}
+          <span class="text-[10px] font-normal text-slate-500">/{AI_SCORE_MAX}</span>
+        </>
+      ) : (
+        <span class="text-[10px] font-medium text-slate-400">—</span>
+      )
+    }
+  </span>
+</div>

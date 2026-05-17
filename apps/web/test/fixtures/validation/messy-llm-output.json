@@ -1,0 +1,42 @@
+{
+  "candidateSummary": {
+    "overview": "Backend engineer with Go experience and API design work.",
+    "highlights": ["4 years Go", "REST and GraphQL exposure"]
+  },
+  "requirementMatches": [
+    {
+      "requirement": "Go",
+      "requirement_type": "required",
+      "judgment": "supported",
+      "confidence": "high",
+      "evidence": {
+        "source": "cv",
+        "quote": "Built production services in Go for 4 years",
+        "strength": "strong"
+      },
+      "gaps": [],
+      "suggested_score": 4,
+      "rationale": "Sustained Go usage in recent roles."
+    },
+    {
+      "requirement": "GraphQL",
+      "requirementType": "nice-to-have",
+      "judgement": "claimed",
+      "confidence": "medium",
+      "evidence": {
+        "cv": "Lists GraphQL in skills without project detail"
+      },
+      "suggestedScore": 2,
+      "explanation": "Mentioned but not demonstrated in depth."
+    }
+  ],
+  "overall": {
+    "strengths": ["Strong backend experience"],
+    "gaps": ["Limited GraphQL evidence"],
+    "concerns": [],
+    "suggested_interview_questions": ["Describe a Go service you owned end to end."],
+    "summary": "Promising backend profile; verify GraphQL in interview.",
+    "confidence": "medium",
+    "confidence_rationale": "Required Go skill has strong CV quotes; nice-to-have GraphQL lacks demonstrated projects."
+  }
+}
