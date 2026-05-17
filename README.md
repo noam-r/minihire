@@ -154,7 +154,7 @@ Migration `1747066600_ai_evaluation_collections` adds PocketBase collections for
 
    In production, schedule `run-ai-worker.sh` every 1–2 minutes (cron or a supervisor). The `web` container must reach your LLM provider API over HTTPS.
 
-4. CLI (ops / debugging): `pnpm ai:normalize`, `pnpm ai:validate`, `pnpm ai:evaluate -- --application <id> --started-by <users-id>`.
+4. CLI (ops / debugging): `pnpm ai:normalize`, `pnpm ai:validate`, `pnpm ai:evaluate -- --application <id> --started-by <users-id>`, `pnpm enqueue-ai-evaluations -- --dry-run` (queue all unevaluated applications for the worker).
 
 Recruiters see scores and evidence on the application page; full tables live at `/recruiter/applications/<id>/ai`. GitHub evidence (Phase 3) is not implemented yet.
 

@@ -16,6 +16,7 @@
     "ai:evaluate": "pnpm --filter web ai:evaluate",
     "ai:github": "pnpm --filter web ai:github",
     "ai:worker": "pnpm --filter web ai:worker",
+    "enqueue-ai-evaluations": "pnpm --filter web enqueue-ai-evaluations",
     "test": "pnpm --filter web test"
   },
   "devDependencies": {
