@@ -13,7 +13,7 @@ async function main() {
     runIdArg ??
     (await createEvaluationRun(pb, {
       applicationId,
-      startedByUserId: resolveCliStartedByUserId(),
+      startedByUserId: await resolveCliStartedByUserId(),
       runType: "cv_validation",
     }));
 

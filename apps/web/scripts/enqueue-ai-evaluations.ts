@@ -25,7 +25,7 @@ function parseLimit(): number | undefined {
 async function main() {
   const dryRun = hasFlag("--dry-run");
   const limit = parseLimit();
-  const startedByUserId = resolveCliStartedByUserId();
+  const startedByUserId = await resolveCliStartedByUserId();
   const pb = await getCliPocketBase();
 
   const result = await enqueueEvaluationRuns(pb, {

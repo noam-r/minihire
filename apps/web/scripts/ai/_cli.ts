@@ -1,7 +1,7 @@
 import "../load-env.js";
 
+import { resolveCliStartedByUserId as resolveStartedBy } from "../../src/lib/ai/cli-started-by";
 import { getSubmissionServicePocketBase } from "../../src/lib/pocketbase";
-import { runtimeEnv } from "../../src/lib/server-env";
 
 export function getArg(flag: string): string | undefined {
   const index = process.argv.indexOf(flag);
@@ -23,14 +23,6 @@ export async function getCliPocketBase() {
   return getSubmissionServicePocketBase();
 }
 
-export function resolveCliStartedByUserId(): string {
-  const fromArg = getArg("--started-by");
-  const fromEnv = runtimeEnv("AI_CLI_STARTED_BY_USER_ID");
-  const id = fromArg ?? fromEnv;
-  if (!id) {
-    throw new Error(
-      "Pass --started-by <users-id> or set AI_CLI_STARTED_BY_USER_ID (PocketBase users record for audit)",
-    );
-  }
-  return id;
+export function resolveCliStartedByUserId(): Promise<string> {
+  return resolveStartedBy(getArg);
 }
