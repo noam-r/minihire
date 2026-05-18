@@ -1,0 +1,174 @@
+---
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import { markClarificationSeen } from "../../../lib/clarification/service";
+import { MAX_ANSWER_LENGTH } from "../../../lib/clarification/validation";
+import { getCompanyNameForClarification } from "../../../lib/clarification/email";
+import { getSubmissionServicePocketBase } from "../../../lib/pocketbase";
+import { getPageTitle } from "../../../lib/site";
+
+export const prerender = false;
+
+const publicToken = String(Astro.params.uuid ?? "").trim();
+const companyName = getCompanyNameForClarification();
+const justSubmitted = Astro.url.searchParams.get("thanks") === "1";
+
+type PageState = "form" | "submitted" | "unavailable";
+
+let pageState: PageState = "unavailable";
+let jobTitle = "";
+let items: { id: string; question_text: string }[] = [];
+let submitToken = "";
+
+if (publicToken) {
+  try {
+    const pb = await getSubmissionServicePocketBase();
+    const userAgent = Astro.request.headers.get("user-agent") ?? undefined;
+    const result = await markClarificationSeen(pb, publicToken, { userAgent });
+
+    if (result.alreadySubmitted || justSubmitted) {
+      pageState = "submitted";
+    } else if (result.unavailable) {
+      pageState = "unavailable";
+    } else {
+      pageState = "form";
+      jobTitle = result.request.job_title || "your application";
+      items = result.items.map((item) => ({
+        id: item.id,
+        question_text: item.question_text,
+      }));
+      submitToken = publicToken;
+    }
+  } catch {
+    pageState = "unavailable";
+  }
+}
+---
+
+<BaseLayout
+  title={getPageTitle("Follow-up questions")}
+  description="Answer a few follow-up questions for your application."
+>
+  <section class="mx-auto max-w-2xl rounded-2xl border border-slate-200 bg-white p-8 shadow-sm md:p-10">
+    {
+      pageState === "form" && (
+        <>
+          <h1 class="text-2xl font-semibold tracking-tight text-slate-900">A few follow-up questions</h1>
+          <p class="mt-3 text-base leading-7 text-slate-600">
+            Thanks for applying for {jobTitle}. The {companyName} hiring team would like to clarify a few
+            details before moving forward.
+          </p>
+
+          <form id="clarification-form" class="mt-8 space-y-6">
+            {items.map((item) => (
+              <div>
+                <label class="block text-sm font-medium text-slate-800" for={`answer-${item.id}`}>
+                  {item.question_text}
+                </label>
+                <textarea
+                  id={`answer-${item.id}`}
+                  name={item.id}
+                  rows={4}
+                  required
+                  maxlength={MAX_ANSWER_LENGTH}
+                  class="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-sky-600 focus:outline-none focus:ring-1 focus:ring-sky-600"
+                />
+              </div>
+            ))}
+
+            <p id="form-error" class="hidden text-sm text-red-700" role="alert" />
+
+            <button type="submit" class="btn-primary w-full justify-center sm:w-auto">
+              Submit answers
+            </button>
+          </form>
+
+          <script is:inline define:vars={{ submitToken, items, maxAnswerLen: MAX_ANSWER_LENGTH }}>
+            const form = document.getElementById("clarification-form");
+            const errorEl = document.getElementById("form-error");
+            if (!form) {
+              throw new Error("Clarification form missing");
+            }
+
+            form.addEventListener("submit", async (event) => {
+              event.preventDefault();
+              if (errorEl) {
+                errorEl.classList.add("hidden");
+                errorEl.textContent = "";
+              }
+
+              const answers = items.map((item) => {
+                const field = form.querySelector(`[name="${item.id}"]`);
+                return {
+                  itemId: item.id,
+                  answerText: field instanceof HTMLTextAreaElement ? field.value : "",
+                };
+              });
+
+              const submitBtn = form.querySelector('button[type="submit"]');
+              if (submitBtn instanceof HTMLButtonElement) {
+                submitBtn.disabled = true;
+              }
+
+              try {
+                const response = await fetch(`/api/candidate/clarification/${encodeURIComponent(submitToken)}/submit`, {
+                  method: "POST",
+                  headers: { "content-type": "application/json" },
+                  body: JSON.stringify({ answers }),
+                });
+
+                if (response.ok) {
+                  window.location.href = `${window.location.pathname}?thanks=1`;
+                  return;
+                }
+
+                let message = "Something went wrong. Please try again.";
+                if (response.status === 429) {
+                  message = "Too many attempts. Please wait and try again.";
+                } else if (response.status === 409) {
+                  message = "This link is no longer available.";
+                }
+                if (errorEl) {
+                  errorEl.textContent = message;
+                  errorEl.classList.remove("hidden");
+                }
+              } catch {
+                if (errorEl) {
+                  errorEl.textContent = "Something went wrong. Please try again.";
+                  errorEl.classList.remove("hidden");
+                }
+              } finally {
+                if (submitBtn instanceof HTMLButtonElement) {
+                  submitBtn.disabled = false;
+                }
+              }
+            });
+          </script>
+        </>
+      )
+    }
+
+    {
+      pageState === "submitted" && (
+        <div>
+          <h1 class="text-2xl font-semibold tracking-tight text-slate-900">Thank you</h1>
+          <p class="mt-3 text-base leading-7 text-slate-600">
+            {justSubmitted
+              ? "Thank you. Your answers have been submitted."
+              : "Thank you. Your answers were already submitted."}
+          </p>
+        </div>
+      )
+    }
+
+    {
+      pageState === "unavailable" && (
+        <div>
+          <h1 class="text-2xl font-semibold tracking-tight text-slate-900">Link unavailable</h1>
+          <p class="mt-3 text-base leading-7 text-slate-600">
+            This clarification link is no longer available.
+          </p>
+        </div>
+      )
+    }
+  </section>
+</BaseLayout>

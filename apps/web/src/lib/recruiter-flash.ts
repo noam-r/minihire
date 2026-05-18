@@ -11,6 +11,9 @@ export const recruiterApplicationDetailErrors: Record<string, string> = {
   note: "Notes must be between 1 and 8,000 characters.",
   note_save: "The note could not be saved.",
   ai_run: "Could not queue AI evaluation. An evaluation may already be in progress.",
+  clarification_active: "A clarification request is already waiting for the candidate.",
+  clarification_email:
+    "The clarification request could not be emailed to the candidate. Please try again.",
 };
 
 /** `?error=` codes on `/recruiter/jobs` (list). */

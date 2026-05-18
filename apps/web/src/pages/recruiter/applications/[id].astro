@@ -1,5 +1,13 @@
 ---
 import RecruiterAiPanel from "../../../components/RecruiterAiPanel.astro";
+import RecruiterClarificationPanel from "../../../components/recruiter/RecruiterClarificationPanel.astro";
+import { getSuggestedClarificationQuestions } from "../../../lib/clarification/ai-suggestions";
+import {
+  findActiveClarificationRequest,
+  listClarificationItemsForRequest,
+  listClarificationRequestsForApplication,
+  syncApplicationClarificationExpiry,
+} from "../../../lib/clarification/service";
 import RecruiterLayout from "../../../layouts/RecruiterLayout.astro";
 import type { JobRecord } from "../../../lib/ai/pocketbase";
 import {
@@ -40,6 +48,7 @@ const flash = {
   updated: Astro.url.searchParams.get("updated") === "1",
   note: Astro.url.searchParams.get("note") === "1",
   aiRequested: Astro.url.searchParams.get("ai_requested") === "1",
+  clarificationSent: Astro.url.searchParams.get("clarification_sent") === "1",
   error: Astro.url.searchParams.get("error"),
 };
 
@@ -98,7 +107,24 @@ const linkedinUrl = optionalApplicantUrl(record.linkedin_url);
 const aiSnapshot = await loadRecruiterAiSnapshot(pb, id);
 const aiAutoRefresh = aiSnapshot.state === "in_progress";
 const aiFullDetailHref = `/recruiter/applications/${id}/ai`;
+
+const clarificationRequests = await listClarificationRequestsForApplication(pb, id);
+await syncApplicationClarificationExpiry(pb, id, clarificationRequests, now);
+const activeClarification = await findActiveClarificationRequest(pb, id);
+const hasEmailFailed = clarificationRequests.some(
+  (r) => r.status === "cancelled" && r.cancel_reason === "candidate_email_failed",
+);
+const suggestedForClarify = await getSuggestedClarificationQuestions(pb, id);
+const hasAiSuggestions = suggestedForClarify.length > 0 && !activeClarification;
+
+const clarificationHistory = await Promise.all(
+  clarificationRequests.map(async (request) => ({
+    request,
+    items: await listClarificationItemsForRequest(pb, request.id),
+  })),
+);
 ---
+
 
 <RecruiterLayout title={`${record.full_name} | ${companyName}`}>
   {aiAutoRefresh && <meta slot="head" http-equiv="refresh" content="12" />}
@@ -145,6 +171,13 @@ const aiFullDetailHref = `/recruiter/applications/${id}/ai`;
     flash.aiRequested && (
       <p class="mb-6 rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-sm text-violet-950">
         AI evaluation queued. Results appear here when processing finishes (reload or wait for auto-refresh).
+      </p>
+    )
+  }
+  {
+    flash.clarificationSent && (
+      <p class="mb-6 rounded-md border border-teal-200 bg-teal-50 px-3 py-2 text-sm text-teal-900">
+        Clarification request sent to the candidate.
       </p>
     )
   }
@@ -376,6 +409,15 @@ const aiFullDetailHref = `/recruiter/applications/${id}/ai`;
         fullDetailHref={aiFullDetailHref}
         jobContext={aiJobContext}
         contact={aiContact}
+      />
+
+      <RecruiterClarificationPanel
+        applicationId={record.id}
+        history={clarificationHistory}
+        hasAiSuggestions={hasAiSuggestions}
+        hasEmailFailed={hasEmailFailed}
+        activeRequest={activeClarification}
+        now={now}
       />
 
       <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">

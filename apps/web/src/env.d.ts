@@ -22,6 +22,7 @@ interface ImportMetaEnv {
   readonly GITHUB_TOKEN?: string;
   readonly GITHUB_MAX_REPOS?: string;
   readonly GITHUB_MAX_COMMITS_PER_REPO?: string;
+  readonly MINIHIRE_SYSTEM_ALERTS_EMAIL?: string;
 }
 
 interface ImportMeta {

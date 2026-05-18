@@ -1,0 +1,216 @@
+---
+import RecruiterLayout from "../../../../layouts/RecruiterLayout.astro";
+import { getSuggestedClarificationQuestions } from "../../../../lib/clarification/ai-suggestions";
+import { findActiveClarificationRequest } from "../../../../lib/clarification/email-logs";
+import { MAX_CLARIFICATION_QUESTIONS, MAX_QUESTION_LENGTH } from "../../../../lib/clarification/validation";
+import { ensureSessionCsrfCookie } from "../../../../lib/recruiter-auth/cookies";
+import { getCompanyName } from "../../../../lib/site";
+
+export const prerender = false;
+
+const id = Astro.params.id;
+if (!id) {
+  return Astro.redirect("/recruiter/applications");
+}
+
+const { pb } = Astro.locals.recruiter!;
+const csrf = ensureSessionCsrfCookie(Astro.cookies);
+const companyName = getCompanyName();
+
+const errorCode = Astro.url.searchParams.get("error");
+const errorMsg =
+  errorCode === "invalid"
+    ? "Check your questions and try again."
+    : undefined;
+
+let record;
+try {
+  record = await pb.collection("applications").getOne(id);
+} catch {
+  return Astro.redirect("/recruiter/applications");
+}
+
+const active = await findActiveClarificationRequest(pb, id);
+if (active) {
+  return Astro.redirect(`/recruiter/applications/${id}`);
+}
+
+const suggestedQuestions = await getSuggestedClarificationQuestions(pb, id);
+const initialQuestions =
+  suggestedQuestions.length > 0
+    ? suggestedQuestions
+    : [{ text: "", source: "recruiter_added" as const }];
+
+const pageTitle =
+  suggestedQuestions.length > 0 ? "Ask candidate for clarification" : "Ask candidate for clarification";
+const submitLabel = "Send to candidate";
+---
+
+<RecruiterLayout title={`${pageTitle} | ${companyName}`}>
+  <p class="text-sm text-slate-600">
+    <a class="text-teal-800 hover:text-teal-900" href={`/recruiter/applications/${id}`}>← Application</a>
+  </p>
+
+  <h1 class="mt-4 text-2xl font-semibold text-slate-900">{pageTitle}</h1>
+  <p class="mt-2 text-sm text-slate-600">
+    Review the questions below before sending them to {record.full_name || "the candidate"}.
+  </p>
+
+  {errorMsg && (
+    <p class="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">{errorMsg}</p>
+  )}
+
+  <form
+    id="clarify-form"
+    method="post"
+    action="/recruiter/actions/send-clarification"
+    class="mt-8 max-w-2xl space-y-4"
+  >
+    <input type="hidden" name="csrf" value={csrf} />
+    <input type="hidden" name="application_id" value={id} />
+
+    <div id="questions-root" class="space-y-4" data-max={MAX_CLARIFICATION_QUESTIONS} data-max-len={MAX_QUESTION_LENGTH}>
+      {
+        initialQuestions.map((q, index) => (
+          <div class="question-row rounded-lg border border-slate-200 bg-white p-4 shadow-sm" data-index={index}>
+            <label class="block text-xs font-medium text-slate-600">
+              Question {index + 1}
+              <textarea
+                name={`questions[${index}][text]`}
+                rows={3}
+                maxlength={MAX_QUESTION_LENGTH}
+                required={index === 0}
+                class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600"
+              >{q.text}</textarea>
+            </label>
+            <input type="hidden" name={`questions[${index}][source]`} value={q.source} class="source-field" />
+            <div class="mt-2 flex flex-wrap gap-2">
+              <button type="button" class="btn-secondary btn-sm move-up" disabled={index === 0}>
+                Move up
+              </button>
+              <button type="button" class="btn-secondary btn-sm move-down" disabled={index === initialQuestions.length - 1}>
+                Move down
+              </button>
+              <button type="button" class="btn-secondary btn-sm remove-row" disabled={initialQuestions.length <= 1}>
+                Remove
+              </button>
+            </div>
+          </div>
+        ))
+      }
+    </div>
+
+    <button type="button" id="add-question" class="btn-secondary btn-sm">Add question</button>
+
+    <div class="flex flex-wrap gap-3 border-t border-slate-200 pt-6">
+      <button type="submit" class="btn-primary">{submitLabel}</button>
+      <a class="btn-secondary no-underline" href={`/recruiter/applications/${id}`}>Cancel</a>
+    </div>
+  </form>
+
+  <script is:inline>
+    const root = document.getElementById("questions-root");
+    const form = document.getElementById("clarify-form");
+    const addBtn = document.getElementById("add-question");
+    if (!root || !form || !addBtn) {
+      throw new Error("Clarify editor elements missing");
+    }
+
+    const maxQuestions = Number(root.dataset.max) || 10;
+    const maxLen = Number(root.dataset.maxLen) || 1000;
+
+    function reindexRows() {
+      const rows = [...root.querySelectorAll(".question-row")];
+      rows.forEach((row, index) => {
+        row.dataset.index = String(index);
+        const label = row.querySelector("label");
+        if (label) {
+          label.childNodes[0].textContent = `Question ${index + 1} `;
+        }
+        const textarea = row.querySelector("textarea");
+        if (textarea) {
+          textarea.name = `questions[${index}][text]`;
+          textarea.required = index === 0 && rows.length === 1;
+        }
+        const source = row.querySelector(".source-field");
+        if (source instanceof HTMLInputElement) {
+          source.name = `questions[${index}][source]`;
+        }
+        const up = row.querySelector(".move-up");
+        const down = row.querySelector(".move-down");
+        const remove = row.querySelector(".remove-row");
+        if (up instanceof HTMLButtonElement) {
+          up.disabled = index === 0;
+        }
+        if (down instanceof HTMLButtonElement) {
+          down.disabled = index === rows.length - 1;
+        }
+        if (remove instanceof HTMLButtonElement) {
+          remove.disabled = rows.length <= 1;
+        }
+      });
+      addBtn.disabled = rows.length >= maxQuestions;
+    }
+
+    function createRow(text = "", source = "recruiter_added") {
+      const div = document.createElement("div");
+      div.className = "question-row rounded-lg border border-slate-200 bg-white p-4 shadow-sm";
+      div.innerHTML = `
+        <label class="block text-xs font-medium text-slate-600">
+          Question
+          <textarea name="questions[0][text]" rows="3" maxlength="${maxLen}" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600"></textarea>
+        </label>
+        <input type="hidden" name="questions[0][source]" value="${source}" class="source-field" />
+        <div class="mt-2 flex flex-wrap gap-2">
+          <button type="button" class="btn-secondary btn-sm move-up">Move up</button>
+          <button type="button" class="btn-secondary btn-sm move-down">Move down</button>
+          <button type="button" class="btn-secondary btn-sm remove-row">Remove</button>
+        </div>`;
+      const textarea = div.querySelector("textarea");
+      if (textarea) {
+        textarea.value = text;
+      }
+      return div;
+    }
+
+    addBtn.addEventListener("click", () => {
+      const count = root.querySelectorAll(".question-row").length;
+      if (count >= maxQuestions) {
+        return;
+      }
+      root.appendChild(createRow());
+      reindexRows();
+    });
+
+    root.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+      const row = target.closest(".question-row");
+      if (!row || !root.contains(row)) {
+        return;
+      }
+      const rows = [...root.querySelectorAll(".question-row")];
+      const index = rows.indexOf(row);
+      if (target.classList.contains("remove-row") && rows.length > 1) {
+        row.remove();
+        reindexRows();
+        return;
+      }
+      if (target.classList.contains("move-up") && index > 0) {
+        const prev = rows[index - 1];
+        if (prev) root.insertBefore(row, prev);
+        reindexRows();
+        return;
+      }
+      if (target.classList.contains("move-down") && index < rows.length - 1) {
+        const next = rows[index + 1];
+        if (next) root.insertBefore(next, row);
+        reindexRows();
+      }
+    });
+
+    reindexRows();
+  </script>
+</RecruiterLayout>

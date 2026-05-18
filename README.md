@@ -158,6 +158,16 @@ Migration `1747066600_ai_evaluation_collections` adds PocketBase collections for
 
 Recruiters see scores and evidence on the application page; full tables live at `/recruiter/applications/<id>/ai`. GitHub evidence (Phase 3) is not implemented yet.
 
+### Candidate clarification (follow-up questions)
+
+Migration `1747067300_clarification_flow` adds `clarification_requests`, `clarification_items`, and summary fields on `applications`.
+
+1. On an application detail page, use **Clarify** (or **Review and send** when AI suggested questions exist) to open `/recruiter/applications/<id>/clarify`, edit questions, and send.
+2. The candidate receives an email with a secure link to `/candidate/clarification/<token>` (expires after 14 days).
+3. Set `MINIHIRE_SYSTEM_ALERTS_EMAIL` in `.env` (server-only) to receive an internal email when the candidate submits answers. If unset in development, answers are still saved and a warning is logged.
+
+Spec: [`tmp/minihire-clarification-flow-spec.md`](tmp/minihire-clarification-flow-spec.md).
+
 ## PocketBase Notes
 
 - `jobs` is public **list/view** for **published** roles only. Authenticated portal users (`users` with `role` + `active`) can list and view jobs in any status per migration rules.
