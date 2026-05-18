@@ -1,7 +1,11 @@
 ---
 import RecruiterLayout from "../../../../layouts/RecruiterLayout.astro";
 import { getSuggestedClarificationQuestions } from "../../../../lib/clarification/ai-suggestions";
-import { findActiveClarificationRequest } from "../../../../lib/clarification/email-logs";
+import {
+  findActiveClarificationRequest,
+  findUndeliveredClarificationRequest,
+} from "../../../../lib/clarification/email-logs";
+import { reconcileUndeliveredClarificationRequests } from "../../../../lib/clarification/service";
 import { MAX_CLARIFICATION_QUESTIONS, MAX_QUESTION_LENGTH } from "../../../../lib/clarification/validation";
 import { ensureSessionCsrfCookie } from "../../../../lib/recruiter-auth/cookies";
 import { getCompanyName } from "../../../../lib/site";
@@ -30,9 +34,11 @@ try {
   return Astro.redirect("/recruiter/applications");
 }
 
+await reconcileUndeliveredClarificationRequests(pb, id);
 const active = await findActiveClarificationRequest(pb, id);
-if (active) {
-  return Astro.redirect(`/recruiter/applications/${id}`);
+const undelivered = await findUndeliveredClarificationRequest(pb, id);
+if (active || undelivered) {
+  return Astro.redirect(`/recruiter/applications/${id}#clarification`);
 }
 
 const suggestedQuestions = await getSuggestedClarificationQuestions(pb, id);

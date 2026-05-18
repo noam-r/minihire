@@ -4,8 +4,10 @@ import RecruiterClarificationPanel from "../../../components/recruiter/Recruiter
 import { getSuggestedClarificationQuestions } from "../../../lib/clarification/ai-suggestions";
 import {
   findActiveClarificationRequest,
+  findUndeliveredClarificationRequest,
   listClarificationItemsForRequest,
   listClarificationRequestsForApplication,
+  reconcileUndeliveredClarificationRequests,
   syncApplicationClarificationExpiry,
 } from "../../../lib/clarification/service";
 import type {
@@ -53,6 +55,7 @@ const flash = {
   note: Astro.url.searchParams.get("note") === "1",
   aiRequested: Astro.url.searchParams.get("ai_requested") === "1",
   clarificationSent: Astro.url.searchParams.get("clarification_sent") === "1",
+  clarificationCancelled: Astro.url.searchParams.get("clarification_cancelled") === "1",
   error: Astro.url.searchParams.get("error"),
 };
 
@@ -117,11 +120,14 @@ let activeClarification: ClarificationRequestRecord | null = null;
 let hasEmailFailed = false;
 let hasAiSuggestions = false;
 let clarificationHistory: { request: ClarificationRequestRecord; items: ClarificationItemRecord[] }[] = [];
+let undeliveredClarification: ClarificationRequestRecord | null = null;
 
 try {
+  await reconcileUndeliveredClarificationRequests(pb, id, now);
   clarificationRequests = await listClarificationRequestsForApplication(pb, id);
   await syncApplicationClarificationExpiry(pb, id, clarificationRequests, now);
   activeClarification = await findActiveClarificationRequest(pb, id);
+  undeliveredClarification = await findUndeliveredClarificationRequest(pb, id);
   hasEmailFailed = clarificationRequests.some(
     (r) => r.status === "cancelled" && r.cancel_reason === "candidate_email_failed",
   );
@@ -192,6 +198,13 @@ try {
     flash.clarificationSent && (
       <p class="mb-6 rounded-md border border-teal-200 bg-teal-50 px-3 py-2 text-sm text-teal-900">
         Clarification request sent to the candidate.
+      </p>
+    )
+  }
+  {
+    flash.clarificationCancelled && (
+      <p class="mb-6 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800">
+        Undelivered clarification cancelled. You can send a new request.
       </p>
     )
   }
@@ -431,6 +444,8 @@ try {
         hasAiSuggestions={hasAiSuggestions}
         hasEmailFailed={hasEmailFailed}
         activeRequest={activeClarification}
+        undeliveredRequest={undeliveredClarification}
+        csrf={csrf}
         now={now}
       />
 

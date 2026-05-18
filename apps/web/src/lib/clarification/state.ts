@@ -14,6 +14,17 @@ export function isActiveClarificationStatus(status: ClarificationRequestStatus):
   return ACTIVE_CLARIFICATION_STATUSES.includes(status);
 }
 
+/** True only after Resend accepted the candidate email (not merely record created). */
+export function clarificationEmailWasSent(
+  request: Pick<ClarificationRequestRecord, "candidate_email_sent_at">,
+): boolean {
+  return Boolean(String(request.candidate_email_sent_at ?? "").trim());
+}
+
+export function isUndeliveredClarificationRequest(request: ClarificationRequestRecord): boolean {
+  return isActiveClarificationStatus(request.status) && !clarificationEmailWasSent(request);
+}
+
 export function effectiveClarificationRequestStatus(
   request: ClarificationRequestRecord,
   now = new Date(),

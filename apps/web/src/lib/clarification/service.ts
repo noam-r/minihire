@@ -9,12 +9,18 @@ import {
   sendClarificationCandidateEmail,
   sendClarificationCompletedAlert,
 } from "./email";
-import { createClarificationEmailLog, findActiveClarificationRequest } from "./email-logs";
+import {
+  createClarificationEmailLog,
+  findActiveClarificationRequest,
+  findUndeliveredClarificationRequest,
+} from "./email-logs";
 import {
   applicationStatusFromRequest,
+  clarificationEmailWasSent,
   effectiveClarificationRequestStatus,
   isActiveClarificationStatus,
   isClarificationExpired,
+  isUndeliveredClarificationRequest,
 } from "./state";
 import { generateClarificationPublicToken } from "./tokens";
 import type {
@@ -30,7 +36,7 @@ import {
 } from "./validation";
 
 export { getSuggestedClarificationQuestions } from "./ai-suggestions";
-export { findActiveClarificationRequest } from "./email-logs";
+export { findActiveClarificationRequest, findUndeliveredClarificationRequest } from "./email-logs";
 
 export class ClarificationConflictError extends Error {
   constructor(message: string) {
@@ -59,6 +65,167 @@ function escapeFilterValue(value: string): string {
 
 function toIso(date: Date): string {
   return date.toISOString();
+}
+
+async function cancelClarificationRequest(
+  pb: PocketBase,
+  requestId: string,
+  reason: string,
+  now = new Date(),
+): Promise<void> {
+  const cancelledAt = toIso(now);
+  const updated = await pb.collection("clarification_requests").update<ClarificationRequestRecord>(
+    requestId,
+    {
+      status: "cancelled",
+      cancelled_at: cancelledAt,
+      cancel_reason: reason,
+    },
+  );
+  await updateApplicationClarificationSummary(pb, updated.application, updated, now);
+}
+
+async function finalizeCandidateEmailSend(
+  pb: PocketBase,
+  input: {
+    request: ClarificationRequestRecord;
+    applicationId: string;
+    email: string;
+    candidateName: string;
+    jobTitle: string;
+    publicToken: string;
+    expiresAt: string;
+    sentAt: string;
+  },
+): Promise<ClarificationRequestRecord> {
+  const clarificationUrl = buildClarificationUrl(input.publicToken);
+  const providerMessageId = await sendClarificationCandidateEmail({
+    to: input.email,
+    candidateName: input.candidateName,
+    jobTitle: input.jobTitle,
+    clarificationUrl,
+    expiresAt: new Date(input.expiresAt),
+  });
+
+  let emailLogId: string | undefined;
+  try {
+    emailLogId = await createClarificationEmailLog({
+      applicationId: input.applicationId,
+      clarificationRequestId: input.request.id,
+      template: "clarification_request",
+      recipient: input.email,
+      status: "sent",
+      providerMessageId,
+    });
+  } catch (logError) {
+    console.error("Clarification email log (sent) failed:", logError);
+  }
+
+  const updated = await pb.collection("clarification_requests").update<ClarificationRequestRecord>(
+    input.request.id,
+    {
+      status: "sent",
+      sent_at: input.sentAt,
+      candidate_email_sent_at: input.sentAt,
+      ...(emailLogId ? { candidate_email_log: emailLogId } : {}),
+    },
+  );
+
+  await updateApplicationClarificationSummary(pb, input.applicationId, updated);
+  return updated;
+}
+
+/** Cancel in-flight requests that never got questions or email (e.g. failed mid-create). */
+export async function reconcileUndeliveredClarificationRequests(
+  pb: PocketBase,
+  applicationId: string,
+  now = new Date(),
+): Promise<void> {
+  const aid = escapeFilterValue(applicationId);
+  const rows = await pb.collection("clarification_requests").getFullList<ClarificationRequestRecord>({
+    filter: `application = "${aid}" && (status = "sent" || status = "opened")`,
+  });
+
+  for (const row of rows) {
+    if (!isUndeliveredClarificationRequest(row)) {
+      continue;
+    }
+    const items = await listClarificationItemsForRequest(pb, row.id);
+    if (items.length === 0) {
+      await cancelClarificationRequest(pb, row.id, "candidate_email_failed", now);
+    }
+  }
+}
+
+export async function resendClarificationRequestEmail(
+  pb: PocketBase,
+  requestId: string,
+): Promise<ClarificationRequestRecord> {
+  let request: ClarificationRequestRecord;
+  try {
+    request = await pb.collection("clarification_requests").getOne<ClarificationRequestRecord>(requestId);
+  } catch {
+    throw new ClarificationNotFoundError();
+  }
+
+  if (!isUndeliveredClarificationRequest(request)) {
+    throw new ClarificationConflictError("Clarification email was already sent for this request");
+  }
+
+  const items = await listClarificationItemsForRequest(pb, request.id);
+  if (!items.length) {
+    throw new ClarificationConflictError("Clarification request has no questions");
+  }
+
+  const now = new Date();
+  const sentAt = toIso(now);
+
+  try {
+    return await finalizeCandidateEmailSend(pb, {
+      request,
+      applicationId: request.application,
+      email: request.candidate_email,
+      candidateName: String(request.candidate_name ?? ""),
+      jobTitle: String(request.job_title ?? ""),
+      publicToken: request.public_token,
+      expiresAt: request.expires_at,
+      sentAt,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("Clarification resend email failed:", message);
+    try {
+      await createClarificationEmailLog({
+        applicationId: request.application,
+        clarificationRequestId: request.id,
+        template: "clarification_request",
+        recipient: request.candidate_email,
+        status: "failed",
+        errorMessage: message,
+      });
+    } catch (logError) {
+      console.error("Failed to log clarification resend failure:", logError);
+    }
+    throw error;
+  }
+}
+
+export async function cancelUndeliveredClarificationRequest(
+  pb: PocketBase,
+  requestId: string,
+): Promise<void> {
+  let request: ClarificationRequestRecord;
+  try {
+    request = await pb.collection("clarification_requests").getOne<ClarificationRequestRecord>(requestId);
+  } catch {
+    throw new ClarificationNotFoundError();
+  }
+
+  if (!isUndeliveredClarificationRequest(request)) {
+    throw new ClarificationConflictError("Only undelivered clarification requests can be cancelled");
+  }
+
+  await cancelClarificationRequest(pb, request.id, "candidate_email_failed", new Date());
 }
 
 async function updateApplicationClarificationSummary(
@@ -167,9 +334,18 @@ export async function createAndSendClarificationRequest(
     questions: ClarificationQuestionInput[];
   },
 ): Promise<ClarificationRequestRecord> {
+  await reconcileUndeliveredClarificationRequests(pb, input.applicationId);
+
   const active = await findActiveClarificationRequest(pb, input.applicationId);
   if (active) {
     throw new ClarificationConflictError("Active clarification request already exists");
+  }
+
+  const undelivered = await findUndeliveredClarificationRequest(pb, input.applicationId);
+  if (undelivered) {
+    throw new ClarificationConflictError(
+      "An undelivered clarification request already exists; resend or cancel it first",
+    );
   }
 
   const aiSuggestions = (await getSuggestedClarificationQuestions(pb, input.applicationId)).map(
@@ -200,87 +376,65 @@ export async function createAndSendClarificationRequest(
   const expiresAt = toIso(defaultClarificationExpiresAt(now));
   const publicToken = generateClarificationPublicToken();
 
-  const request = await pb.collection("clarification_requests").create<ClarificationRequestRecord>({
-    public_token: publicToken,
-    application: input.applicationId,
-    job: jobId || undefined,
-    job_title: jobTitle,
-    candidate_email: email,
-    candidate_name: String(application.full_name ?? "").trim() || "",
-    status: "sent",
-    created_by: input.actorUserId,
-    sent_at: sentAt,
-    expires_at: expiresAt,
-  });
-
-  // PocketBase treats 0 as blank for required number fields — use 1-based positions.
-  for (let index = 0; index < normalized.length; index++) {
-    const q = normalized[index]!;
-    await pb.collection("clarification_items").create({
-      request: request.id,
-      position: index + 1,
-      question_text: q.text,
-      source: q.source,
-    });
-  }
-
-  const clarificationUrl = buildClarificationUrl(publicToken);
-
+  let request: ClarificationRequestRecord | undefined;
   try {
-    const providerMessageId = await sendClarificationCandidateEmail({
-      to: email,
-      candidateName: String(application.full_name ?? ""),
-      jobTitle,
-      clarificationUrl,
-      expiresAt: new Date(expiresAt),
+    request = await pb.collection("clarification_requests").create<ClarificationRequestRecord>({
+      public_token: publicToken,
+      application: input.applicationId,
+      job: jobId || undefined,
+      job_title: jobTitle,
+      candidate_email: email,
+      candidate_name: String(application.full_name ?? "").trim() || "",
+      status: "sent",
+      created_by: input.actorUserId,
+      expires_at: expiresAt,
     });
 
-    let emailLogId: string | undefined;
-    try {
-      emailLogId = await createClarificationEmailLog({
-        applicationId: input.applicationId,
-        clarificationRequestId: request.id,
-        template: "clarification_request",
-        recipient: email,
-        status: "sent",
-        providerMessageId,
+    // PocketBase treats 0 as blank for required number fields — use 1-based positions.
+    for (let index = 0; index < normalized.length; index++) {
+      const q = normalized[index]!;
+      await pb.collection("clarification_items").create({
+        request: request.id,
+        position: index + 1,
+        question_text: q.text,
+        source: q.source,
       });
-    } catch (logError) {
-      console.error("Clarification email log (sent) failed:", logError);
     }
 
-    const updated = await pb.collection("clarification_requests").update<ClarificationRequestRecord>(
-      request.id,
-      {
-        candidate_email_sent_at: sentAt,
-        ...(emailLogId ? { candidate_email_log: emailLogId } : {}),
-      },
-    );
-
-    await updateApplicationClarificationSummary(pb, input.applicationId, updated, now);
-    return updated;
+    return await finalizeCandidateEmailSend(pb, {
+      request,
+      applicationId: input.applicationId,
+      email,
+      candidateName: String(application.full_name ?? ""),
+      jobTitle,
+      publicToken,
+      expiresAt,
+      sentAt,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error("Clarification candidate email failed:", message);
 
-    try {
-      await createClarificationEmailLog({
-        applicationId: input.applicationId,
-        clarificationRequestId: request.id,
-        template: "clarification_request",
-        recipient: email,
-        status: "failed",
-        errorMessage: message,
-      });
-    } catch (logError) {
-      console.error("Failed to log clarification email failure:", logError);
-    }
+    if (request) {
+      try {
+        await createClarificationEmailLog({
+          applicationId: input.applicationId,
+          clarificationRequestId: request.id,
+          template: "clarification_request",
+          recipient: email,
+          status: "failed",
+          errorMessage: message,
+        });
+      } catch (logError) {
+        console.error("Failed to log clarification email failure:", logError);
+      }
 
-    await pb.collection("clarification_requests").update(request.id, {
-      status: "cancelled",
-      cancelled_at: sentAt,
-      cancel_reason: "candidate_email_failed",
-    });
+      try {
+        await cancelClarificationRequest(pb, request.id, "candidate_email_failed", now);
+      } catch (cancelError) {
+        console.error("Failed to cancel undelivered clarification request:", cancelError);
+      }
+    }
 
     throw error;
   }
@@ -311,6 +465,10 @@ export async function markClarificationSeen(
   }
 
   if (request.status === "cancelled") {
+    return { request, items, alreadySubmitted: false, unavailable: true };
+  }
+
+  if (!clarificationEmailWasSent(request)) {
     return { request, items, alreadySubmitted: false, unavailable: true };
   }
 
@@ -365,6 +523,9 @@ export async function submitClarificationAnswers(
   }
   if (request.status !== "sent" && request.status !== "opened") {
     throw new ClarificationConflictError("Invalid request state");
+  }
+  if (!clarificationEmailWasSent(request)) {
+    throw new ClarificationGoneError();
   }
 
   const items = await listClarificationItemsForRequest(pb, request.id);

@@ -15,10 +15,21 @@ interface Props {
   hasAiSuggestions: boolean;
   hasEmailFailed: boolean;
   activeRequest: ClarificationRequestRecord | null;
+  undeliveredRequest: ClarificationRequestRecord | null;
+  csrf: string;
   now: Date;
 }
 
-const { applicationId, history, hasAiSuggestions, hasEmailFailed, activeRequest, now } = Astro.props;
+const {
+  applicationId,
+  history,
+  hasAiSuggestions,
+  hasEmailFailed,
+  activeRequest,
+  undeliveredRequest,
+  csrf,
+  now,
+} = Astro.props;
 
 const clarifyHref = `/recruiter/applications/${applicationId}/clarify`;
 const clarifyLabel = hasAiSuggestions ? "Review and send" : "Clarify";
@@ -56,7 +67,33 @@ function formatTs(value: string | undefined): string {
 
   <div class="space-y-6 px-5 py-4">
     {
-      !activeRequest && history.length === 0 && (
+      undeliveredRequest && (
+        <div class="rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <p class="text-sm font-medium text-amber-950">Email not sent</p>
+          <p class="mt-2 text-sm text-amber-900">
+            Clarification questions were saved, but the candidate did not receive an email. You can
+            send the email now or cancel and start over.
+          </p>
+          <div class="mt-4 flex flex-wrap gap-2">
+            <form method="post" action="/recruiter/actions/resend-clarification" class="inline">
+              <input type="hidden" name="csrf" value={csrf} />
+              <input type="hidden" name="application_id" value={applicationId} />
+              <input type="hidden" name="request_id" value={undeliveredRequest.id} />
+              <button type="submit" class="btn-primary btn-sm">Send email to candidate</button>
+            </form>
+            <form method="post" action="/recruiter/actions/cancel-undelivered-clarification" class="inline">
+              <input type="hidden" name="csrf" value={csrf} />
+              <input type="hidden" name="application_id" value={applicationId} />
+              <input type="hidden" name="request_id" value={undeliveredRequest.id} />
+              <button type="submit" class="btn-secondary btn-sm">Cancel and start over</button>
+            </form>
+          </div>
+        </div>
+      )
+    }
+
+    {
+      !activeRequest && !undeliveredRequest && history.length === 0 && (
         <div>
           <p class="text-sm text-slate-600">No clarification requested yet.</p>
           {
@@ -107,7 +144,8 @@ function formatTs(value: string | undefined): string {
           request.status === "cancelled" && request.cancel_reason === "candidate_email_failed";
         const isExpired = effective === "expired";
         const isActive =
-          activeRequest && activeRequest.id === request.id;
+          (activeRequest && activeRequest.id === request.id) ||
+          (undeliveredRequest && undeliveredRequest.id === request.id);
 
         if (isActive && !isSubmitted) {
           return null;
@@ -161,7 +199,7 @@ function formatTs(value: string | undefined): string {
     }
 
     {
-      !activeRequest && history.length > 0 && (
+      !activeRequest && !undeliveredRequest && history.length > 0 && (
         <div>
           {
             hasEmailFailed && (
