@@ -533,10 +533,10 @@ export async function submitClarificationAnswers(
   const submittedAt = toIso(now);
 
   for (const item of items) {
-    const answerText = answerMap.get(item.id)!;
+    const answerText = answerMap.get(item.id) ?? "";
     await pb.collection("clarification_items").update(item.id, {
       answer_text: answerText,
-      answered_at: submittedAt,
+      answered_at: answerText ? submittedAt : "",
     });
   }
 

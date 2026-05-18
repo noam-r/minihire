@@ -102,8 +102,8 @@ export function validateClarificationAnswers(
   const seen = new Set<string>();
   const result = new Map<string, string>();
 
-  if (answers.length !== items.length) {
-    throw new ClarificationValidationError("Please answer every question.", "missing_answer");
+  for (const item of items) {
+    result.set(item.id, "");
   }
 
   for (const answer of answers) {
@@ -118,9 +118,6 @@ export function validateClarificationAnswers(
     }
 
     const text = trimText(answer.answerText);
-    if (!text) {
-      throw new ClarificationValidationError("Answer cannot be empty.", "empty_answer");
-    }
     if (text.length > MAX_ANSWER_LENGTH) {
       throw new ClarificationValidationError(
         `Answer is too long. Maximum length is ${MAX_ANSWER_LENGTH} characters.`,
@@ -128,12 +125,6 @@ export function validateClarificationAnswers(
       );
     }
     result.set(answer.itemId, text);
-  }
-
-  for (const item of items) {
-    if (!seen.has(item.id)) {
-      throw new ClarificationValidationError("Please answer every question.", "missing_answer");
-    }
   }
 
   return result;

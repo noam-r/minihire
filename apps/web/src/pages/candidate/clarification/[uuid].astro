@@ -57,18 +57,21 @@ if (publicToken) {
             Thanks for applying for {jobTitle}. The {companyName} hiring team would like to clarify a few
             details before moving forward.
           </p>
+          <p class="mt-2 text-sm text-slate-500">
+            You can skip any question you prefer not to answer. Submit when you are ready.
+          </p>
 
           <form id="clarification-form" class="mt-8 space-y-6">
             {items.map((item) => (
               <div>
                 <label class="block text-sm font-medium text-slate-800" for={`answer-${item.id}`}>
                   {item.question_text}
+                  <span class="ml-1 font-normal text-slate-500">(optional)</span>
                 </label>
                 <textarea
                   id={`answer-${item.id}`}
                   name={item.id}
                   rows={4}
-                  required
                   maxlength={MAX_ANSWER_LENGTH}
                   class="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-sky-600 focus:outline-none focus:ring-1 focus:ring-sky-600"
                 />

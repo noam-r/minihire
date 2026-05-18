@@ -128,18 +128,24 @@ try {
   await syncApplicationClarificationExpiry(pb, id, clarificationRequests, now);
   activeClarification = await findActiveClarificationRequest(pb, id);
   undeliveredClarification = await findUndeliveredClarificationRequest(pb, id);
-  hasEmailFailed = clarificationRequests.some(
-    (r) => r.status === "cancelled" && r.cancel_reason === "candidate_email_failed",
-  );
+  const hasSubmittedClarification = clarificationRequests.some((r) => r.status === "submitted");
+  hasEmailFailed =
+    !hasSubmittedClarification &&
+    clarificationRequests.some(
+      (r) => r.status === "cancelled" && r.cancel_reason === "candidate_email_failed",
+    );
   const suggestedForClarify = await getSuggestedClarificationQuestions(pb, id);
-  hasAiSuggestions = suggestedForClarify.length > 0 && !activeClarification;
+  hasAiSuggestions = suggestedForClarify.length > 0 && !activeClarification && !hasSubmittedClarification;
 
-  clarificationHistory = await Promise.all(
-    clarificationRequests.map(async (request) => ({
-      request,
-      items: await listClarificationItemsForRequest(pb, request.id),
-    })),
-  );
+  for (const request of clarificationRequests) {
+    try {
+      const items = await listClarificationItemsForRequest(pb, request.id);
+      clarificationHistory.push({ request, items });
+    } catch (itemError) {
+      console.error(`Clarification items load failed for request ${request.id}:`, itemError);
+      clarificationHistory.push({ request, items: [] });
+    }
+  }
 } catch (error) {
   console.error("Clarification panel load failed:", error);
 }

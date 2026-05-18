@@ -5,7 +5,10 @@ import {
   findActiveClarificationRequest,
   findUndeliveredClarificationRequest,
 } from "../../../../lib/clarification/email-logs";
-import { reconcileUndeliveredClarificationRequests } from "../../../../lib/clarification/service";
+import {
+  listClarificationRequestsForApplication,
+  reconcileUndeliveredClarificationRequests,
+} from "../../../../lib/clarification/service";
 import { MAX_CLARIFICATION_QUESTIONS, MAX_QUESTION_LENGTH } from "../../../../lib/clarification/validation";
 import { ensureSessionCsrfCookie } from "../../../../lib/recruiter-auth/cookies";
 import { getCompanyName } from "../../../../lib/site";
@@ -34,10 +37,18 @@ try {
   return Astro.redirect("/recruiter/applications");
 }
 
+const wantsNewRound = Astro.url.searchParams.get("new") === "1";
+
 await reconcileUndeliveredClarificationRequests(pb, id);
 const active = await findActiveClarificationRequest(pb, id);
 const undelivered = await findUndeliveredClarificationRequest(pb, id);
 if (active || undelivered) {
+  return Astro.redirect(`/recruiter/applications/${id}#clarification`);
+}
+
+const priorRequests = await listClarificationRequestsForApplication(pb, id);
+const hasSubmittedClarification = priorRequests.some((r) => r.status === "submitted");
+if (hasSubmittedClarification && !wantsNewRound) {
   return Astro.redirect(`/recruiter/applications/${id}#clarification`);
 }
 
@@ -47,8 +58,11 @@ const initialQuestions =
     ? suggestedQuestions
     : [{ text: "", source: "recruiter_added" as const }];
 
-const pageTitle =
-  suggestedQuestions.length > 0 ? "Ask candidate for clarification" : "Ask candidate for clarification";
+const pageTitle = wantsNewRound
+  ? "Ask follow-up questions"
+  : suggestedQuestions.length > 0
+    ? "Review clarification questions"
+    : "Ask candidate for clarification";
 const submitLabel = "Send to candidate";
 ---
 

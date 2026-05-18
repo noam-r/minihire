@@ -31,8 +31,17 @@ const {
   now,
 } = Astro.props;
 
-const clarifyHref = `/recruiter/applications/${applicationId}/clarify`;
-const clarifyLabel = hasAiSuggestions ? "Review and send" : "Clarify";
+const clarifyBaseHref = `/recruiter/applications/${applicationId}/clarify`;
+const clarifyNewHref = `${clarifyBaseHref}?new=1`;
+
+const submittedRounds = history.filter(({ request }) => request.status === "submitted");
+const latestSubmitted = submittedRounds[0] ?? null;
+const hasCompletedClarification = latestSubmitted !== null;
+const canStartNew = !activeRequest && !undeliveredRequest;
+const showEmailFailedNotice = hasEmailFailed && !hasCompletedClarification;
+
+const startClarifyLabel =
+  hasAiSuggestions && !hasCompletedClarification ? "Review and send" : "Ask follow-up questions";
 
 function statusLabel(status: string): string {
   switch (status) {
@@ -57,6 +66,11 @@ function formatTs(value: string | undefined): string {
   }
   return formatSubmittedAt(value);
 }
+
+function formatAnswer(text: string | undefined): string {
+  const trimmed = String(text ?? "").trim();
+  return trimmed || "No answer provided";
+}
 ---
 
 <section id="clarification" class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -75,13 +89,13 @@ function formatTs(value: string | undefined): string {
             send the email now or cancel and start over.
           </p>
           <div class="mt-4 flex flex-wrap gap-2">
-            <form method="post" action="/recruiter/actions/resend-clarification" class="inline">
+            <form method="post" action="/recruiter/actions/resend-clarification">
               <input type="hidden" name="csrf" value={csrf} />
               <input type="hidden" name="application_id" value={applicationId} />
               <input type="hidden" name="request_id" value={undeliveredRequest.id} />
               <button type="submit" class="btn-primary btn-sm">Send email to candidate</button>
             </form>
-            <form method="post" action="/recruiter/actions/cancel-undelivered-clarification" class="inline">
+            <form method="post" action="/recruiter/actions/cancel-undelivered-clarification">
               <input type="hidden" name="csrf" value={csrf} />
               <input type="hidden" name="application_id" value={applicationId} />
               <input type="hidden" name="request_id" value={undeliveredRequest.id} />
@@ -93,19 +107,39 @@ function formatTs(value: string | undefined): string {
     }
 
     {
-      !activeRequest && !undeliveredRequest && history.length === 0 && (
-        <div>
-          <p class="text-sm text-slate-600">No clarification requested yet.</p>
-          {
-            hasEmailFailed && (
-              <p class="mt-2 text-sm text-amber-800">
-                The last clarification email could not be sent. You can try again.
-              </p>
-            )
-          }
-          <a class="btn-primary btn-sm mt-4 inline-flex no-underline" href={clarifyHref}>
-            {clarifyLabel}
-          </a>
+      latestSubmitted && (
+        <div class="rounded-lg border border-teal-100 bg-teal-50/50 p-4">
+          <p class="text-sm font-medium text-slate-900">Clarification completed</p>
+          <p class="mt-2 text-xs text-slate-500">
+            Sent:{" "}
+            <span title={formatTs(latestSubmitted.request.sent_at)}>
+              {formatRelativeTime(latestSubmitted.request.sent_at, now)}
+            </span>
+            {" · "}
+            Opened:{" "}
+            <span title={latestSubmitted.request.seen_at ? formatTs(latestSubmitted.request.seen_at) : undefined}>
+              {latestSubmitted.request.seen_at
+                ? formatRelativeTime(latestSubmitted.request.seen_at, now)
+                : "—"}
+            </span>
+            {" · "}
+            Submitted:{" "}
+            <span title={formatTs(latestSubmitted.request.submitted_at)}>
+              {formatRelativeTime(latestSubmitted.request.submitted_at, now)}
+            </span>
+          </p>
+          <div class="mt-4 space-y-4">
+            {latestSubmitted.items.length === 0 ? (
+              <p class="text-sm text-slate-600">Answers could not be loaded. Reload the page to try again.</p>
+            ) : (
+              latestSubmitted.items.map((item) => (
+                <div class="text-sm">
+                  <p class="font-medium text-slate-800">Q: {item.question_text}</p>
+                  <p class="mt-1 whitespace-pre-wrap text-slate-700">{formatAnswer(item.answer_text)}</p>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       )
     }
@@ -137,12 +171,36 @@ function formatTs(value: string | undefined): string {
     }
 
     {
+      canStartNew && !hasCompletedClarification && history.length === 0 && (
+        <div>
+          <p class="text-sm text-slate-600">No clarification requested yet.</p>
+          {
+            showEmailFailedNotice && (
+              <p class="mt-2 text-sm text-amber-800">
+                The last clarification email could not be sent. You can try again.
+              </p>
+            )
+          }
+          <a class="btn-primary btn-sm mt-4 inline-flex no-underline" href={clarifyNewHref}>
+            {startClarifyLabel}
+          </a>
+        </div>
+      )
+    }
+
+    {
       history.map(({ request, items }) => {
         const effective = effectiveClarificationRequestStatus(request, now);
-        const isSubmitted = effective === "submitted";
+        const isSubmitted = request.status === "submitted";
         const isFailed =
           request.status === "cancelled" && request.cancel_reason === "candidate_email_failed";
         const isExpired = effective === "expired";
+        const isLatestSubmitted = latestSubmitted?.request.id === request.id;
+
+        if (isLatestSubmitted) {
+          return null;
+        }
+
         const isActive =
           (activeRequest && activeRequest.id === request.id) ||
           (undeliveredRequest && undeliveredRequest.id === request.id);
@@ -158,14 +216,6 @@ function formatTs(value: string | undefined): string {
                 <>
                   <p class="text-sm font-medium text-slate-900">Clarification completed</p>
                   <p class="mt-2 text-xs text-slate-500">
-                    Sent:{" "}
-                    <span title={formatTs(request.sent_at)}>{formatRelativeTime(request.sent_at, now)}</span>
-                    {" · "}
-                    Opened:{" "}
-                    <span title={request.seen_at ? formatTs(request.seen_at) : undefined}>
-                      {request.seen_at ? formatRelativeTime(request.seen_at, now) : "—"}
-                    </span>
-                    {" · "}
                     Submitted:{" "}
                     <span title={formatTs(request.submitted_at)}>
                       {formatRelativeTime(request.submitted_at, now)}
@@ -175,7 +225,7 @@ function formatTs(value: string | undefined): string {
                     {items.map((item) => (
                       <div class="text-sm">
                         <p class="font-medium text-slate-800">Q: {item.question_text}</p>
-                        <p class="mt-1 whitespace-pre-wrap text-slate-700">A: {item.answer_text ?? "—"}</p>
+                        <p class="mt-1 whitespace-pre-wrap text-slate-700">{formatAnswer(item.answer_text)}</p>
                       </div>
                     ))}
                   </div>
@@ -199,17 +249,28 @@ function formatTs(value: string | undefined): string {
     }
 
     {
-      !activeRequest && !undeliveredRequest && history.length > 0 && (
-        <div>
+      canStartNew && (hasCompletedClarification || history.length > 0) && (
+        <div class="border-t border-slate-100 pt-5">
           {
-            hasEmailFailed && (
+            showEmailFailedNotice && !hasCompletedClarification && history.length > 0 && (
               <p class="mb-3 text-sm text-amber-800">
                 The last clarification email could not be sent. You can try again.
               </p>
             )
           }
-          <a class="btn-secondary btn-sm inline-flex no-underline" href={clarifyHref}>
-            {clarifyLabel}
+          {
+            hasCompletedClarification ? (
+              <p class="text-sm text-slate-600">Send another round of follow-up questions if needed.</p>
+            ) : null
+          }
+          <a
+            class:list={[
+              "mt-4 inline-flex no-underline",
+              hasCompletedClarification ? "btn-secondary btn-sm" : "btn-primary btn-sm",
+            ]}
+            href={clarifyNewHref}
+          >
+            {startClarifyLabel}
           </a>
         </div>
       )

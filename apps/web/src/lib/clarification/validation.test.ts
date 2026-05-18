@@ -58,4 +58,16 @@ describe("validateClarificationAnswers", () => {
     assert.equal(map.get("a"), "one");
     assert.equal(map.get("b"), "two");
   });
+
+  it("accepts partial answers with blanks for omitted questions", () => {
+    const map = validateClarificationAnswers(items, [{ itemId: "a", answerText: "only one" }]);
+    assert.equal(map.get("a"), "only one");
+    assert.equal(map.get("b"), "");
+  });
+
+  it("accepts all-empty answers", () => {
+    const map = validateClarificationAnswers(items, []);
+    assert.equal(map.get("a"), "");
+    assert.equal(map.get("b"), "");
+  });
 });
