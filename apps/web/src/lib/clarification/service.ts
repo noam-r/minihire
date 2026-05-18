@@ -113,15 +113,17 @@ export async function listClarificationRequestsForApplication(
   applicationId: string,
 ): Promise<ClarificationRequestRecord[]> {
   const aid = escapeFilterValue(applicationId);
+  // No API sort: collection has no autodate `created` field (PocketBase returns 400 on invalid sort).
   const rows = await pb.collection("clarification_requests").getFullList<ClarificationRequestRecord>({
     filter: `application = "${aid}"`,
-    expand: "created_by",
-    sort: "-sent_at,-created",
   });
   return rows.sort((a, b) => {
-    const ta = Date.parse(String(a.sent_at ?? a.created ?? ""));
-    const tb = Date.parse(String(b.sent_at ?? b.created ?? ""));
-    return tb - ta;
+    const ta = Date.parse(String(a.sent_at ?? ""));
+    const tb = Date.parse(String(b.sent_at ?? ""));
+    if (Number.isFinite(ta) && Number.isFinite(tb) && ta !== tb) {
+      return tb - ta;
+    }
+    return b.id.localeCompare(a.id);
   });
 }
 

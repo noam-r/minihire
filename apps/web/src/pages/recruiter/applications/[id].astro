@@ -8,6 +8,10 @@ import {
   listClarificationRequestsForApplication,
   syncApplicationClarificationExpiry,
 } from "../../../lib/clarification/service";
+import type {
+  ClarificationItemRecord,
+  ClarificationRequestRecord,
+} from "../../../lib/clarification/types";
 import RecruiterLayout from "../../../layouts/RecruiterLayout.astro";
 import type { JobRecord } from "../../../lib/ai/pocketbase";
 import {
@@ -108,21 +112,31 @@ const aiSnapshot = await loadRecruiterAiSnapshot(pb, id);
 const aiAutoRefresh = aiSnapshot.state === "in_progress";
 const aiFullDetailHref = `/recruiter/applications/${id}/ai`;
 
-const clarificationRequests = await listClarificationRequestsForApplication(pb, id);
-await syncApplicationClarificationExpiry(pb, id, clarificationRequests, now);
-const activeClarification = await findActiveClarificationRequest(pb, id);
-const hasEmailFailed = clarificationRequests.some(
-  (r) => r.status === "cancelled" && r.cancel_reason === "candidate_email_failed",
-);
-const suggestedForClarify = await getSuggestedClarificationQuestions(pb, id);
-const hasAiSuggestions = suggestedForClarify.length > 0 && !activeClarification;
+let clarificationRequests: ClarificationRequestRecord[] = [];
+let activeClarification: ClarificationRequestRecord | null = null;
+let hasEmailFailed = false;
+let hasAiSuggestions = false;
+let clarificationHistory: { request: ClarificationRequestRecord; items: ClarificationItemRecord[] }[] = [];
 
-const clarificationHistory = await Promise.all(
-  clarificationRequests.map(async (request) => ({
-    request,
-    items: await listClarificationItemsForRequest(pb, request.id),
-  })),
-);
+try {
+  clarificationRequests = await listClarificationRequestsForApplication(pb, id);
+  await syncApplicationClarificationExpiry(pb, id, clarificationRequests, now);
+  activeClarification = await findActiveClarificationRequest(pb, id);
+  hasEmailFailed = clarificationRequests.some(
+    (r) => r.status === "cancelled" && r.cancel_reason === "candidate_email_failed",
+  );
+  const suggestedForClarify = await getSuggestedClarificationQuestions(pb, id);
+  hasAiSuggestions = suggestedForClarify.length > 0 && !activeClarification;
+
+  clarificationHistory = await Promise.all(
+    clarificationRequests.map(async (request) => ({
+      request,
+      items: await listClarificationItemsForRequest(pb, request.id),
+    })),
+  );
+} catch (error) {
+  console.error("Clarification panel load failed:", error);
+}
 ---
 
 
