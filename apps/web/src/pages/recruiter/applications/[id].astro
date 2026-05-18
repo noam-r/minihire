@@ -1,5 +1,6 @@
 ---
 import RecruiterAiPanel from "../../../components/RecruiterAiPanel.astro";
+import RecruiterClarificationAnswers from "../../../components/recruiter/RecruiterClarificationAnswers.astro";
 import RecruiterClarificationPanel from "../../../components/recruiter/RecruiterClarificationPanel.astro";
 import { getSuggestedClarificationQuestions } from "../../../lib/clarification/ai-suggestions";
 import {
@@ -181,6 +182,21 @@ try {
         <span class="text-xs text-slate-500">({formatSubmittedAt(record.submitted_at)})</span>
       </span>
     </p>
+    <div class="mt-4 flex flex-wrap gap-2">
+      <a
+        class="btn-secondary btn-sm inline-flex no-underline"
+        href={`/recruiter/applications/${id}/dossier-export?format=markdown`}
+        download
+      >
+        Export dossier (Markdown)
+      </a>
+      <a
+        class="btn-secondary btn-sm inline-flex no-underline"
+        href={`/recruiter/applications/${id}/dossier-export?format=pdf`}
+      >
+        Export dossier (PDF)
+      </a>
+    </div>
   </div>
 
   {
@@ -386,6 +402,8 @@ try {
           </dl>
         </div>
       </section>
+
+      <RecruiterClarificationAnswers history={clarificationHistory} now={now} />
     </div>
 
     <!-- Recruiter workflow -->

@@ -1,0 +1,102 @@
+---
+import type { ClarificationItemRecord, ClarificationRequestRecord } from "../../lib/clarification/types";
+import { formatSubmittedAt, NOT_PROVIDED } from "../../lib/recruiter-application-display";
+import { formatRelativeTime } from "../../lib/relative-time";
+
+interface RequestWithItems {
+  request: ClarificationRequestRecord;
+  items: ClarificationItemRecord[];
+}
+
+interface Props {
+  history: RequestWithItems[];
+  now: Date;
+}
+
+const { history, now } = Astro.props;
+
+const submittedRounds = history
+  .filter(({ request }) => request.status === "submitted")
+  .sort((a, b) => {
+    const ta = Date.parse(String(a.request.submitted_at ?? ""));
+    const tb = Date.parse(String(b.request.submitted_at ?? ""));
+    if (Number.isFinite(ta) && Number.isFinite(tb) && ta !== tb) {
+      return tb - ta;
+    }
+    return b.request.id.localeCompare(a.request.id);
+  });
+
+function formatTs(value: string | undefined): string {
+  if (!value) {
+    return "—";
+  }
+  return formatSubmittedAt(value);
+}
+
+function formatAnswer(text: string | undefined): string {
+  const trimmed = String(text ?? "").trim();
+  return trimmed || NOT_PROVIDED;
+}
+---
+
+{
+  submittedRounds.length > 0 && (
+    <section
+      id="clarification"
+      class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
+      aria-labelledby="clarification-answers-heading"
+    >
+      <header class="border-b border-slate-100 bg-slate-50/80 px-5 py-4">
+        <h2 id="clarification-answers-heading" class="text-base font-semibold text-slate-900">
+          Clarification answers
+        </h2>
+        <p class="mt-1 text-xs leading-relaxed text-slate-600">
+          Read-only: follow-up questions the candidate answered after you sent a clarification request.
+        </p>
+      </header>
+
+      <div class="divide-y divide-slate-100">
+        {submittedRounds.map(({ request, items }, roundIndex) => (
+          <article class="px-5 py-4">
+            {
+              submittedRounds.length > 1 && (
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Round {submittedRounds.length - roundIndex}
+                </p>
+              )
+            }
+            <p class:list={["text-xs text-slate-500", submittedRounds.length > 1 && "mt-2"]}>
+              Sent{" "}
+              <span title={formatTs(request.sent_at)}>{formatRelativeTime(request.sent_at, now)}</span>
+              {" · "}
+              Opened{" "}
+              <span title={request.seen_at ? formatTs(request.seen_at) : undefined}>
+                {request.seen_at ? formatRelativeTime(request.seen_at, now) : "—"}
+              </span>
+              {" · "}
+              Submitted{" "}
+              <span title={formatTs(request.submitted_at)}>
+                {formatRelativeTime(request.submitted_at, now)}
+              </span>
+            </p>
+
+            {items.length === 0 ? (
+              <p class="mt-4 text-sm text-slate-600">
+                Answers could not be loaded. Reload the page to try again.
+              </p>
+            ) : (
+              <dl class="mt-4 divide-y divide-slate-100 text-sm">
+                {items.map((item) => (
+                  <div class="flex flex-col gap-1 py-3 first:pt-0">
+                    <dt class="font-medium text-slate-600">{item.question_text}</dt>
+                    <dd class="mt-1 whitespace-pre-wrap break-words text-slate-900">{formatAnswer(item.answer_text)}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+          </article>
+        ))}
+      </div>
+    </section>
+  )
+}

@@ -242,13 +242,13 @@ const questionCount = snapshot.suggestedQuestions.length;
               <div class="flex flex-wrap gap-2 pb-4">
                 <a
                   class="btn-secondary btn-sm"
-                  href={`/recruiter/applications/${id}/ai-report-export?format=markdown`}
+                  href={`/recruiter/applications/${id}/dossier-export?format=markdown`}
                   download
                 >
-                  Export Markdown
+                  Export dossier (Markdown)
                 </a>
-                <a class="btn-secondary btn-sm" href={`/recruiter/applications/${id}/ai-report-export?format=pdf`}>
-                  Export PDF
+                <a class="btn-secondary btn-sm" href={`/recruiter/applications/${id}/dossier-export?format=pdf`}>
+                  Export dossier (PDF)
                 </a>
               </div>
               <MarkdownContent
