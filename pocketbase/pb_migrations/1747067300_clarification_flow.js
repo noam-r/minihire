@@ -191,7 +191,7 @@ migrate(
           collectionId: clarificationRequests.id,
           cascadeDelete: true,
         },
-        { name: "position", type: "number", required: true, min: 0, max: 99 },
+        { name: "position", type: "number", required: true, min: 1, max: 99 },
         {
           name: "question_text",
           type: "text",

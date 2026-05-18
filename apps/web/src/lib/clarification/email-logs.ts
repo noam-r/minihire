@@ -1,5 +1,7 @@
 import type PocketBase from "pocketbase";
 
+import { getSubmissionServicePocketBase } from "../pocketbase";
+
 function escapeFilterValue(value: string): string {
   return value.replaceAll("\\", "\\\\").replaceAll('"', '\\"');
 }
@@ -8,18 +10,17 @@ export type ClarificationEmailTemplate =
   | "clarification_request"
   | "clarification_completed_alert";
 
-export async function createClarificationEmailLog(
-  pb: PocketBase,
-  input: {
-    applicationId: string;
-    clarificationRequestId: string;
-    template: ClarificationEmailTemplate;
-    recipient: string;
-    status: "sent" | "failed";
-    providerMessageId?: string | null;
-    errorMessage?: string;
-  },
-): Promise<string> {
+/** `email_logs` may only be created by `submission_service` (see PocketBase rules). */
+export async function createClarificationEmailLog(input: {
+  applicationId: string;
+  clarificationRequestId: string;
+  template: ClarificationEmailTemplate;
+  recipient: string;
+  status: "sent" | "failed";
+  providerMessageId?: string | null;
+  errorMessage?: string;
+}): Promise<string> {
+  const pb = await getSubmissionServicePocketBase();
   const record = await pb.collection("email_logs").create({
     application: input.applicationId,
     clarification_request: input.clarificationRequestId,

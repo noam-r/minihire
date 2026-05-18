@@ -213,11 +213,12 @@ export async function createAndSendClarificationRequest(
     expires_at: expiresAt,
   });
 
-  for (let position = 0; position < normalized.length; position++) {
-    const q = normalized[position]!;
+  // PocketBase treats 0 as blank for required number fields — use 1-based positions.
+  for (let index = 0; index < normalized.length; index++) {
+    const q = normalized[index]!;
     await pb.collection("clarification_items").create({
       request: request.id,
-      position,
+      position: index + 1,
       question_text: q.text,
       source: q.source,
     });
@@ -234,20 +235,25 @@ export async function createAndSendClarificationRequest(
       expiresAt: new Date(expiresAt),
     });
 
-    const emailLogId = await createClarificationEmailLog(pb, {
-      applicationId: input.applicationId,
-      clarificationRequestId: request.id,
-      template: "clarification_request",
-      recipient: email,
-      status: "sent",
-      providerMessageId,
-    });
+    let emailLogId: string | undefined;
+    try {
+      emailLogId = await createClarificationEmailLog({
+        applicationId: input.applicationId,
+        clarificationRequestId: request.id,
+        template: "clarification_request",
+        recipient: email,
+        status: "sent",
+        providerMessageId,
+      });
+    } catch (logError) {
+      console.error("Clarification email log (sent) failed:", logError);
+    }
 
     const updated = await pb.collection("clarification_requests").update<ClarificationRequestRecord>(
       request.id,
       {
         candidate_email_sent_at: sentAt,
-        candidate_email_log: emailLogId,
+        ...(emailLogId ? { candidate_email_log: emailLogId } : {}),
       },
     );
 
@@ -258,7 +264,7 @@ export async function createAndSendClarificationRequest(
     console.error("Clarification candidate email failed:", message);
 
     try {
-      await createClarificationEmailLog(pb, {
+      await createClarificationEmailLog({
         applicationId: input.applicationId,
         clarificationRequestId: request.id,
         template: "clarification_request",
@@ -398,7 +404,7 @@ export async function submitClarificationAnswers(
 
     const alertsEmail = runtimeEnv("MINIHIRE_SYSTEM_ALERTS_EMAIL");
     if (providerMessageId && alertsEmail) {
-      const emailLogId = await createClarificationEmailLog(pb, {
+      const emailLogId = await createClarificationEmailLog({
         applicationId: request.application,
         clarificationRequestId: request.id,
         template: "clarification_completed_alert",
@@ -417,7 +423,7 @@ export async function submitClarificationAnswers(
     try {
       const alertsEmail = runtimeEnv("MINIHIRE_SYSTEM_ALERTS_EMAIL");
       if (alertsEmail) {
-        await createClarificationEmailLog(pb, {
+        await createClarificationEmailLog({
           applicationId: request.application,
           clarificationRequestId: request.id,
           template: "clarification_completed_alert",

@@ -61,9 +61,11 @@ export const POST: APIRoute = async (context) => {
       return redirect("/recruiter/applications?error=notfound", 303);
     }
     if (error instanceof ClientResponseError) {
-      console.error("Send clarification:", error.response);
+      console.error("Send clarification PocketBase error:", error.status, error.response);
+    } else if (error instanceof Error) {
+      console.error("Send clarification failed:", error.message);
     } else {
-      console.error("Send clarification:", error);
+      console.error("Send clarification failed:", error);
     }
     return redirect(`/recruiter/applications/${applicationId}?error=clarification_email`, 303);
   }
