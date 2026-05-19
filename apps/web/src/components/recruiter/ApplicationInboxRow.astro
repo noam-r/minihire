@@ -5,8 +5,11 @@ import {
   applicationHasAiScores,
   formatApplicationStatusLabel,
 } from "../../lib/recruiter-applications-list";
-import { formatSubmittedAt } from "../../lib/recruiter-application-display";
-import { formatRelativeTime } from "../../lib/relative-time";
+import {
+  applicationInboxGridClass,
+  applicationInboxGridPaddingClass,
+} from "../../lib/application-inbox-layout";
+import { formatDateTimeTooltip, formatRelativeTime } from "../../lib/relative-time";
 import ApplicationInboxAiScores from "./ApplicationInboxAiScores.astro";
 import ApplicationInboxClarificationBadge from "./ApplicationInboxClarificationBadge.astro";
 import WarningTriangleIcon from "./WarningTriangleIcon.astro";
@@ -24,15 +27,18 @@ const hasWarnings = applicationHasAiLogisticsWarnings(row);
 const updatedAt = row.status_changed_at ?? row.submitted_at;
 const detailHref = `/recruiter/applications/${row.id}`;
 
-function dateTimeTitle(value: string | undefined): string | undefined {
-  const formatted = formatSubmittedAt(value);
-  return formatted !== "N/A" ? formatted : undefined;
-}
+const updatedTooltip = formatDateTimeTooltip(updatedAt);
+const receivedTooltip = formatDateTimeTooltip(row.submitted_at);
 ---
 
 <article class="border-b border-slate-100 last:border-0">
   <div
-    class="grid gap-x-4 gap-y-3 px-4 py-3 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,11rem)_minmax(0,12rem)_minmax(9.5rem,11rem)_auto] lg:items-center"
+    class:list={[
+      "grid gap-y-3 py-3",
+      applicationInboxGridPaddingClass,
+      applicationInboxGridClass,
+      "lg:items-center",
+    ]}
   >
     <div class="min-w-0 space-y-0.5">
       <p class="text-xs font-medium uppercase tracking-wide text-slate-500 lg:hidden">Candidate</p>
@@ -55,19 +61,29 @@ function dateTimeTitle(value: string | undefined): string | undefined {
       <p class="truncate text-sm text-slate-600">{job?.title ?? "—"}</p>
     </div>
 
-    <div class="min-w-0 space-y-0.5 text-sm text-slate-700">
+    <div class="space-y-0.5 whitespace-nowrap text-sm text-slate-700">
       <p class="text-xs font-medium uppercase tracking-wide text-slate-500 lg:hidden">Dates</p>
-      <p title={dateTimeTitle(updatedAt)}>
+      <p>
         <span class="text-slate-500">Updated</span>{" "}
-        {formatRelativeTime(updatedAt, now)}
+        <span
+          class:list={[updatedTooltip && "cursor-help underline decoration-dotted decoration-slate-300 underline-offset-2"]}
+          {...updatedTooltip ? { title: updatedTooltip } : {}}
+        >
+          {formatRelativeTime(updatedAt, now)}
+        </span>
       </p>
-      <p title={dateTimeTitle(row.submitted_at)}>
+      <p>
         <span class="text-slate-500">Received</span>{" "}
-        {formatRelativeTime(row.submitted_at, now)}
+        <span
+          class:list={[receivedTooltip && "cursor-help underline decoration-dotted decoration-slate-300 underline-offset-2"]}
+          {...receivedTooltip ? { title: receivedTooltip } : {}}
+        >
+          {formatRelativeTime(row.submitted_at, now)}
+        </span>
       </p>
     </div>
 
-    <div class="min-w-0">
+    <div>
       <p class="mb-1.5 text-xs font-medium uppercase tracking-wide text-slate-500 lg:hidden">Workflow</p>
       <div class="flex flex-wrap items-center gap-1.5">
         <span class="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-xs font-medium capitalize text-slate-800">

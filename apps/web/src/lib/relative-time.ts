@@ -36,6 +36,25 @@ export function formatRelativeTime(iso: string | undefined | null, now: Date = n
   return then.toLocaleDateString("en", { month: "short", day: "numeric", year: "numeric" });
 }
 
+/** Full local date-time for `title` tooltips on relative-time labels. */
+export function formatDateTimeTooltip(iso: string | undefined | null): string {
+  if (iso == null || String(iso).trim() === "") {
+    return "";
+  }
+  const then = new Date(iso);
+  if (Number.isNaN(then.getTime())) {
+    return "";
+  }
+  return then.toLocaleString("en", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
 export function jobPostingTimingLine(job: unknown, now: Date = new Date()): string {
   const j = job as Record<string, unknown>;
   const status = typeof j.status === "string" ? j.status : "";
