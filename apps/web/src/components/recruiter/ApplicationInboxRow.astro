@@ -1,0 +1,99 @@
+---
+import type { ApplicationRecord } from "../../lib/applications";
+import {
+  applicationHasAiLogisticsWarnings,
+  applicationHasAiScores,
+  formatApplicationStatusLabel,
+} from "../../lib/recruiter-applications-list";
+import { formatRelativeTime } from "../../lib/relative-time";
+import ApplicationInboxAiScores from "./ApplicationInboxAiScores.astro";
+import ApplicationInboxClarificationBadge from "./ApplicationInboxClarificationBadge.astro";
+import WarningTriangleIcon from "./WarningTriangleIcon.astro";
+
+interface Props {
+  row: ApplicationRecord;
+  now: Date;
+}
+
+const { row, now } = Astro.props;
+
+const job = row.expand?.job as { title?: string } | undefined;
+const evaluated = applicationHasAiScores(row);
+const hasWarnings = applicationHasAiLogisticsWarnings(row);
+const updatedAt = row.status_changed_at ?? row.submitted_at;
+const detailHref = `/recruiter/applications/${row.id}`;
+---
+
+<article class="border-b border-slate-100 last:border-0">
+  <div
+    class="grid gap-x-4 gap-y-4 px-4 py-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(9.5rem,11rem)_auto] lg:items-center"
+  >
+    <div class="min-w-0 space-y-1">
+      <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500 lg:hidden">Candidate</p>
+      <div class="flex items-start gap-1.5">
+        {
+          hasWarnings && (
+            <WarningTriangleIcon
+              class="mt-0.5 h-4 w-4 shrink-0 text-amber-600"
+              title="Location or contact details may not match the role"
+            />
+          )
+        }
+        <div class="min-w-0">
+          <a class="font-medium text-teal-900 hover:text-teal-950" href={detailHref}>
+            {row.full_name}
+          </a>
+          <p class="truncate text-xs text-slate-500">{row.email}</p>
+        </div>
+      </div>
+      <p class="text-sm text-slate-700">{job?.title ?? "—"}</p>
+    </div>
+
+    <div class="min-w-0 space-y-2 text-sm text-slate-600">
+      <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500 lg:hidden">Dates</p>
+      <div>
+        <p class="text-xs text-slate-500">Submitted</p>
+        <p class="font-medium text-slate-800">{formatRelativeTime(row.submitted_at, now)}</p>
+        <p class="text-xs text-slate-500">
+          {String(row.submitted_at ?? "").slice(0, 19).replace("T", " ")}
+        </p>
+      </div>
+      <div>
+        <p class="text-xs text-slate-500">Updated</p>
+        <p class="font-medium text-slate-800">{formatRelativeTime(updatedAt, now)}</p>
+        <p class="text-xs text-slate-500">{String(updatedAt ?? "").slice(0, 19).replace("T", " ")}</p>
+      </div>
+    </div>
+
+    <div class="min-w-0 space-y-2">
+      <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500 lg:hidden">Workflow</p>
+      <span class="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-xs font-medium capitalize text-slate-800">
+        {formatApplicationStatusLabel(row.status)}
+      </span>
+      <div>
+        <p class="mb-1 text-[11px] text-slate-500">Clarification</p>
+        <ApplicationInboxClarificationBadge
+          status={row.clarification_status}
+          requestedAt={row.clarification_requested_at}
+          now={now}
+        />
+      </div>
+    </div>
+
+    <div class="min-w-0">
+      <p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500 lg:hidden">AI scores</p>
+      <ApplicationInboxAiScores
+        cvFitScore={row.cv_fit_score}
+        requiredSkillsScore={row.required_skills_score}
+        niceToHaveScore={row.nice_to_have_score}
+        evaluated={evaluated}
+      />
+    </div>
+
+    <div class="flex items-center lg:justify-end">
+      <a class="btn-primary btn-sm inline-flex w-full justify-center no-underline sm:w-auto" href={detailHref}>
+        Open
+      </a>
+    </div>
+  </div>
+</article>

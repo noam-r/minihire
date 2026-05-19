@@ -15,6 +15,10 @@ export type ApplicationRecord = RecordModel & {
   required_skills_score?: number | null;
   nice_to_have_score?: number | null;
   ai_evaluated_at?: string;
+  clarification_status?: string;
+  clarification_requested_at?: string;
+  clarification_seen_at?: string;
+  clarification_answered_at?: string;
 };
 
 export function buildDuplicateKey(email: string, jobId: string): string {

@@ -1,12 +1,10 @@
 ---
-import ApplicationInboxAiScores from "../../../components/recruiter/ApplicationInboxAiScores.astro";
-import WarningTriangleIcon from "../../../components/recruiter/WarningTriangleIcon.astro";
+import ApplicationInboxRow from "../../../components/recruiter/ApplicationInboxRow.astro";
 import RecruiterLayout from "../../../layouts/RecruiterLayout.astro";
 import type { ApplicationRecord } from "../../../lib/applications";
 import {
   APPLICATION_STATUSES,
-  applicationHasAiLogisticsWarnings,
-  applicationHasAiScores,
+  APPLICATIONS_LIST_CLARIFICATION_FILTERS,
   applicationsListQueryString,
   buildApplicationsListFilter,
   buildApplicationsListSort,
@@ -14,7 +12,6 @@ import {
   parseApplicationsListParams,
 } from "../../../lib/recruiter-applications-list";
 import { recruiterApplicationsIndexErrors } from "../../../lib/recruiter-flash";
-import { formatRelativeTime } from "../../../lib/relative-time";
 import { getCompanyName } from "../../../lib/site";
 
 export const prerender = false;
@@ -49,8 +46,17 @@ if (list.totalPages > 0 && listParams.page > list.totalPages) {
   );
 }
 
-const hasActiveFilters = Boolean(listParams.q || listParams.job || listParams.status);
+const hasActiveFilters = Boolean(
+  listParams.q || listParams.job || listParams.status || listParams.clarification,
+);
 const refreshHref = `${Astro.url.pathname}${Astro.url.search}`;
+
+const clarificationFilterLabels: Record<(typeof APPLICATIONS_LIST_CLARIFICATION_FILTERS)[number], string> = {
+  none: "None",
+  waiting: "Waiting for candidate",
+  answered: "Answers received",
+  needs_followup: "Needs follow-up",
+};
 ---
 
 <RecruiterLayout title={`Applications | ${companyName}`}>
@@ -117,6 +123,21 @@ const refreshHref = `${Astro.url.pathname}${Astro.url.search}`;
         </select>
       </div>
       <div>
+        <label class="mb-1 block text-xs font-medium text-slate-600" for="filter-clarification">Clarification</label>
+        <select
+          id="filter-clarification"
+          name="clarification"
+          class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600"
+        >
+          <option value="">All</option>
+          {APPLICATIONS_LIST_CLARIFICATION_FILTERS.map((value) => (
+            <option value={value} selected={listParams.clarification === value}>
+              {clarificationFilterLabels[value]}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div>
         <label class="mb-1 block text-xs font-medium text-slate-600" for="filter-sort">Sort by</label>
         <select
           id="filter-sort"
@@ -152,83 +173,26 @@ const refreshHref = `${Astro.url.pathname}${Astro.url.search}`;
     </div>
   </form>
 
-  <div class="mt-8 overflow-x-auto rounded-lg border border-slate-200 bg-white">
-    <table class="min-w-full divide-y divide-slate-200 text-sm">
-      <thead class="bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-600">
-        <tr>
-          <th class="px-4 py-3">Candidate</th>
-          <th class="px-4 py-3">Job</th>
-          <th class="px-4 py-3">Status</th>
-          <th class="px-3 py-3">AI scores</th>
-          <th class="px-4 py-3">Submitted</th>
-          <th class="px-4 py-3">Updated</th>
-          <th class="px-4 py-3 text-right">Action</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-slate-100">
-        {
-          list.items.length === 0 ? (
-            <tr>
-              <td class="px-4 py-6 text-slate-600" colspan="7">
-                {hasActiveFilters ? "No applications match your filters." : "No applications yet."}
-              </td>
-            </tr>
-          ) : (
-            list.items.map((row) => {
-              const job = row.expand?.job as { title?: string } | undefined;
-              const evaluated = applicationHasAiScores(row);
-              const hasWarnings = applicationHasAiLogisticsWarnings(row);
-              const updatedAt = row.status_changed_at ?? row.submitted_at;
-              return (
-                <tr>
-                  <td class="px-4 py-3">
-                    <div class="flex items-start gap-1.5">
-                      {
-                        hasWarnings && (
-                          <WarningTriangleIcon
-                            class="mt-0.5 h-4 w-4 shrink-0 text-amber-600"
-                            title="Location or contact details may not match the role"
-                          />
-                        )
-                      }
-                      <div class="min-w-0">
-                        <div class="font-medium text-slate-900">{row.full_name}</div>
-                        <div class="text-xs text-slate-500">{row.email}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td class="px-4 py-3 text-slate-700">{job?.title ?? "—"}</td>
-                  <td class="px-4 py-3 capitalize text-slate-700">{formatApplicationStatusLabel(row.status)}</td>
-                  <td class="px-3 py-3">
-                    <ApplicationInboxAiScores
-                      cvFitScore={row.cv_fit_score}
-                      requiredSkillsScore={row.required_skills_score}
-                      niceToHaveScore={row.nice_to_have_score}
-                      evaluated={evaluated}
-                    />
-                  </td>
-                  <td class="px-4 py-3 text-slate-600">
-                    <div class="font-medium text-slate-800">{formatRelativeTime(row.submitted_at, now)}</div>
-                    <div class="text-xs text-slate-500">
-                      {String(row.submitted_at ?? "").slice(0, 19).replace("T", " ")}
-                    </div>
-                  </td>
-                  <td class="px-4 py-3 text-slate-600">
-                    <div class="font-medium text-slate-800">{formatRelativeTime(updatedAt, now)}</div>
-                    <div class="text-xs text-slate-500">{String(updatedAt ?? "").slice(0, 19).replace("T", " ")}</div>
-                  </td>
-                  <td class="px-4 py-3 text-right">
-                    <a class="btn-primary btn-sm inline-flex no-underline" href={`/recruiter/applications/${row.id}`}>
-                      Open
-                    </a>
-                  </td>
-                </tr>
-              );
-            })
-          )
-        }
-      </tbody>
-    </table>
+  <div class="mt-8 overflow-hidden rounded-lg border border-slate-200 bg-white">
+    <div
+      class="hidden border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-medium uppercase tracking-wide text-slate-600 lg:grid lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(9.5rem,11rem)_auto] lg:gap-4"
+    >
+      <span>Candidate</span>
+      <span>Dates</span>
+      <span>Workflow</span>
+      <span>AI scores</span>
+      <span class="text-right">Action</span>
+    </div>
+
+    {
+      list.items.length === 0 ? (
+        <p class="px-4 py-8 text-sm text-slate-600">
+          {hasActiveFilters ? "No applications match your filters." : "No applications yet."}
+        </p>
+      ) : (
+        list.items.map((row) => <ApplicationInboxRow row={row} now={now} />)
+      )
+    }
   </div>
 
   {

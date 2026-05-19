@@ -2,6 +2,8 @@ import type PocketBase from "pocketbase";
 
 import { assessApplicationLogistics } from "./ai/validation/assess-application-logistics";
 import { APPLICATION_STATUSES, isApplicationStatus } from "./application-statuses";
+import type { ApplicationClarificationStatus } from "./clarification/types";
+import { APPLICATION_CLARIFICATION_STATUSES } from "./clarification/types";
 import { splitLinesToList } from "./sanitize";
 
 export const APPLICATIONS_LIST_SORT_FIELDS = [
@@ -16,6 +18,16 @@ export type ApplicationsListSortField = (typeof APPLICATIONS_LIST_SORT_FIELDS)[n
 
 export type ApplicationsListSortDirection = "asc" | "desc";
 
+export const APPLICATIONS_LIST_CLARIFICATION_FILTERS = [
+  "none",
+  "waiting",
+  "answered",
+  "needs_followup",
+] as const;
+
+export type ApplicationsListClarificationFilter =
+  (typeof APPLICATIONS_LIST_CLARIFICATION_FILTERS)[number];
+
 export type ApplicationsListParams = {
   page: number;
   sort: ApplicationsListSortField;
@@ -23,6 +35,14 @@ export type ApplicationsListParams = {
   q: string;
   job: string;
   status: string;
+  clarification: string;
+};
+
+export type ClarificationInboxVariant = "empty" | "waiting" | "answered" | "attention";
+
+export type ClarificationInboxDisplay = {
+  variant: ClarificationInboxVariant;
+  label: string;
 };
 
 const SORT_TO_PB_FIELD: Record<ApplicationsListSortField, string> = {
@@ -49,6 +69,8 @@ export function parseApplicationsListParams(searchParams: URLSearchParams): Appl
   const dirRaw = searchParams.get("dir") ?? "desc";
   const dir: ApplicationsListSortDirection = dirRaw === "asc" ? "asc" : "desc";
 
+  const clarificationRaw = String(searchParams.get("clarification") ?? "").trim();
+
   return {
     page,
     sort,
@@ -56,12 +78,62 @@ export function parseApplicationsListParams(searchParams: URLSearchParams): Appl
     q: String(searchParams.get("q") ?? "").trim(),
     job: String(searchParams.get("job") ?? "").trim(),
     status: String(searchParams.get("status") ?? "").trim(),
+    clarification: APPLICATIONS_LIST_CLARIFICATION_FILTERS.includes(
+      clarificationRaw as ApplicationsListClarificationFilter,
+    )
+      ? clarificationRaw
+      : "",
   };
+}
+
+function isApplicationsListClarificationFilter(
+  value: string,
+): value is ApplicationsListClarificationFilter {
+  return (APPLICATIONS_LIST_CLARIFICATION_FILTERS as readonly string[]).includes(value);
+}
+
+export function buildClarificationListFilterClause(
+  filter: ApplicationsListClarificationFilter,
+): string {
+  switch (filter) {
+    case "none":
+      return '(clarification_status = "none" || clarification_status = "")';
+    case "waiting":
+      return '(clarification_status = "requested" || clarification_status = "seen")';
+    case "answered":
+      return 'clarification_status = "answered"';
+    case "needs_followup":
+      return '(clarification_status = "expired" || clarification_status = "cancelled")';
+  }
+}
+
+export function formatClarificationInboxDisplay(
+  status: string | null | undefined,
+): ClarificationInboxDisplay {
+  const normalized = String(status ?? "").trim() as ApplicationClarificationStatus | "";
+
+  if (!normalized || normalized === "none") {
+    return { variant: "empty", label: "—" };
+  }
+  if (normalized === "requested" || normalized === "seen") {
+    return { variant: "waiting", label: "Waiting for candidate" };
+  }
+  if (normalized === "answered") {
+    return { variant: "answered", label: "Answers received" };
+  }
+  if (normalized === "expired") {
+    return { variant: "attention", label: "Expired" };
+  }
+  if (normalized === "cancelled") {
+    return { variant: "attention", label: "Send failed" };
+  }
+
+  return { variant: "empty", label: "—" };
 }
 
 export function buildApplicationsListFilter(
   pb: PocketBase,
-  params: Pick<ApplicationsListParams, "q" | "job" | "status">,
+  params: Pick<ApplicationsListParams, "q" | "job" | "status" | "clarification">,
 ): string | undefined {
   const clauses: string[] = [];
 
@@ -76,6 +148,10 @@ export function buildApplicationsListFilter(
 
   if (params.status && isApplicationStatus(params.status)) {
     clauses.push(pb.filter('status = {:status}', { status: params.status }));
+  }
+
+  if (params.clarification && isApplicationsListClarificationFilter(params.clarification)) {
+    clauses.push(buildClarificationListFilterClause(params.clarification));
   }
 
   if (!clauses.length) {
@@ -114,6 +190,9 @@ export function applicationsListQueryString(
   }
   if (merged.status) {
     qs.set("status", merged.status);
+  }
+  if (merged.clarification) {
+    qs.set("clarification", merged.clarification);
   }
   if (overrides.error) {
     qs.set("error", overrides.error);
@@ -218,4 +297,4 @@ export function sortLinkParams(
   return { ...current, page: 1, sort: column, dir: "desc" };
 }
 
-export { APPLICATION_STATUSES };
+export { APPLICATION_CLARIFICATION_STATUSES, APPLICATION_STATUSES };

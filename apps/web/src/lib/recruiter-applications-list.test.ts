@@ -9,6 +9,8 @@ import {
   applicationsListQueryString,
   buildApplicationsListFilter,
   buildApplicationsListSort,
+  buildClarificationListFilterClause,
+  formatClarificationInboxDisplay,
   parseApplicationsListParams,
   sortLinkParams,
 } from "./recruiter-applications-list";
@@ -23,7 +25,9 @@ describe("parseApplicationsListParams", () => {
 
   it("parses filters and sort", () => {
     const params = parseApplicationsListParams(
-      new URLSearchParams("page=2&sort=cv_fit&dir=asc&q=search&job=job1&status=reviewing"),
+      new URLSearchParams(
+        "page=2&sort=cv_fit&dir=asc&q=search&job=job1&status=reviewing&clarification=waiting",
+      ),
     );
     assert.equal(params.page, 2);
     assert.equal(params.sort, "cv_fit");
@@ -31,6 +35,7 @@ describe("parseApplicationsListParams", () => {
     assert.equal(params.q, "search");
     assert.equal(params.job, "job1");
     assert.equal(params.status, "reviewing");
+    assert.equal(params.clarification, "waiting");
   });
 });
 
@@ -38,7 +43,7 @@ describe("buildApplicationsListFilter", () => {
   const pb = new PocketBase();
 
   it("returns undefined when no filters", () => {
-    assert.equal(buildApplicationsListFilter(pb, { q: "", job: "", status: "" }), undefined);
+    assert.equal(buildApplicationsListFilter(pb, { q: "", job: "", status: "", clarification: "" }), undefined);
   });
 
   it("combines search, job, and status clauses", () => {
@@ -46,11 +51,58 @@ describe("buildApplicationsListFilter", () => {
       q: "applicant@",
       job: "job123",
       status: "new",
+      clarification: "",
     });
     assert.match(filter!, /full_name ~ "applicant@"/);
     assert.match(filter!, /email ~ "applicant@"/);
     assert.match(filter!, /job = ['"]job123['"]/);
     assert.match(filter!, /status = ['"]new['"]/);
+  });
+
+  it("adds clarification filter clause", () => {
+    const filter = buildApplicationsListFilter(pb, {
+      q: "",
+      job: "",
+      status: "",
+      clarification: "waiting",
+    });
+    assert.match(filter!, /clarification_status = "requested"/);
+    assert.match(filter!, /clarification_status = "seen"/);
+  });
+});
+
+describe("buildClarificationListFilterClause", () => {
+  it("maps inbox filters to PocketBase clauses", () => {
+    assert.match(buildClarificationListFilterClause("none"), /clarification_status = "none"/);
+    assert.match(buildClarificationListFilterClause("answered"), /answered/);
+    assert.match(buildClarificationListFilterClause("needs_followup"), /expired/);
+    assert.match(buildClarificationListFilterClause("needs_followup"), /cancelled/);
+  });
+});
+
+describe("formatClarificationInboxDisplay", () => {
+  it("maps primary clarification states", () => {
+    assert.deepEqual(formatClarificationInboxDisplay("none"), {
+      variant: "empty",
+      label: "—",
+    });
+    assert.deepEqual(formatClarificationInboxDisplay("requested"), {
+      variant: "waiting",
+      label: "Waiting for candidate",
+    });
+    assert.deepEqual(formatClarificationInboxDisplay("seen"), {
+      variant: "waiting",
+      label: "Waiting for candidate",
+    });
+    assert.deepEqual(formatClarificationInboxDisplay("answered"), {
+      variant: "answered",
+      label: "Answers received",
+    });
+  });
+
+  it("maps attention states for expired and cancelled", () => {
+    assert.equal(formatClarificationInboxDisplay("expired").variant, "attention");
+    assert.equal(formatClarificationInboxDisplay("cancelled").label, "Send failed");
   });
 });
 
@@ -71,11 +123,13 @@ describe("applicationsListQueryString", () => {
       q: "test",
       job: "jid",
       status: "maybe",
+      clarification: "answered",
     });
     assert.match(qs, /page=2/);
     assert.match(qs, /sort=required/);
     assert.match(qs, /dir=asc/);
     assert.match(qs, /q=test/);
+    assert.match(qs, /clarification=answered/);
   });
 });
 

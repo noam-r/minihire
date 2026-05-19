@@ -1,0 +1,42 @@
+---
+import { formatClarificationInboxDisplay } from "../../lib/recruiter-applications-list";
+import { formatRelativeTime } from "../../lib/relative-time";
+
+interface Props {
+  status?: string | null;
+  requestedAt?: string | null;
+  now: Date;
+}
+
+const { status, requestedAt, now } = Astro.props;
+
+const display = formatClarificationInboxDisplay(status);
+
+const variantClasses: Record<typeof display.variant, string> = {
+  empty: "border-slate-200 bg-slate-50 text-slate-500",
+  waiting: "border-amber-200 bg-amber-50 text-amber-950",
+  answered: "border-teal-200 bg-teal-50 text-teal-900",
+  attention: "border-slate-300 bg-slate-100 text-slate-700",
+};
+
+const tooltip =
+  display.variant === "waiting" && requestedAt
+    ? `Sent ${formatRelativeTime(requestedAt, now)}`
+    : undefined;
+---
+
+{
+  display.variant === "empty" ? (
+    <span class="text-xs text-slate-400" title="No clarification requested">—</span>
+  ) : (
+    <span
+      class:list={[
+        "inline-flex max-w-full items-center rounded-full border px-2 py-0.5 text-[11px] font-medium leading-tight",
+        variantClasses[display.variant],
+      ]}
+      title={tooltip}
+    >
+      {display.label}
+    </span>
+  )
+}
