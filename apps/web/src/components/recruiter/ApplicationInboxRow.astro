@@ -5,6 +5,7 @@ import {
   applicationHasAiScores,
   formatApplicationStatusLabel,
 } from "../../lib/recruiter-applications-list";
+import { formatSubmittedAt } from "../../lib/recruiter-application-display";
 import { formatRelativeTime } from "../../lib/relative-time";
 import ApplicationInboxAiScores from "./ApplicationInboxAiScores.astro";
 import ApplicationInboxClarificationBadge from "./ApplicationInboxClarificationBadge.astro";
@@ -22,14 +23,19 @@ const evaluated = applicationHasAiScores(row);
 const hasWarnings = applicationHasAiLogisticsWarnings(row);
 const updatedAt = row.status_changed_at ?? row.submitted_at;
 const detailHref = `/recruiter/applications/${row.id}`;
+
+function dateTimeTitle(value: string | undefined): string | undefined {
+  const formatted = formatSubmittedAt(value);
+  return formatted !== "N/A" ? formatted : undefined;
+}
 ---
 
 <article class="border-b border-slate-100 last:border-0">
   <div
-    class="grid gap-x-4 gap-y-4 px-4 py-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(9.5rem,11rem)_auto] lg:items-center"
+    class="grid gap-x-4 gap-y-3 px-4 py-3 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,11rem)_minmax(0,12rem)_minmax(9.5rem,11rem)_auto] lg:items-center"
   >
-    <div class="min-w-0 space-y-1">
-      <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500 lg:hidden">Candidate</p>
+    <div class="min-w-0 space-y-0.5">
+      <p class="text-xs font-medium uppercase tracking-wide text-slate-500 lg:hidden">Candidate</p>
       <div class="flex items-start gap-1.5">
         {
           hasWarnings && (
@@ -40,38 +46,33 @@ const detailHref = `/recruiter/applications/${row.id}`;
           )
         }
         <div class="min-w-0">
-          <a class="font-medium text-teal-900 hover:text-teal-950" href={detailHref}>
+          <a class="text-sm font-semibold text-slate-900 hover:text-teal-900" href={detailHref}>
             {row.full_name}
           </a>
-          <p class="truncate text-xs text-slate-500">{row.email}</p>
+          <p class="truncate text-sm text-slate-500">{row.email}</p>
         </div>
       </div>
-      <p class="text-sm text-slate-700">{job?.title ?? "—"}</p>
+      <p class="truncate text-sm text-slate-600">{job?.title ?? "—"}</p>
     </div>
 
-    <div class="min-w-0 space-y-2 text-sm text-slate-600">
-      <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500 lg:hidden">Dates</p>
-      <div>
-        <p class="text-xs text-slate-500">Submitted</p>
-        <p class="font-medium text-slate-800">{formatRelativeTime(row.submitted_at, now)}</p>
-        <p class="text-xs text-slate-500">
-          {String(row.submitted_at ?? "").slice(0, 19).replace("T", " ")}
-        </p>
-      </div>
-      <div>
-        <p class="text-xs text-slate-500">Updated</p>
-        <p class="font-medium text-slate-800">{formatRelativeTime(updatedAt, now)}</p>
-        <p class="text-xs text-slate-500">{String(updatedAt ?? "").slice(0, 19).replace("T", " ")}</p>
-      </div>
+    <div class="min-w-0 space-y-0.5 text-sm text-slate-700">
+      <p class="text-xs font-medium uppercase tracking-wide text-slate-500 lg:hidden">Dates</p>
+      <p title={dateTimeTitle(updatedAt)}>
+        <span class="text-slate-500">Updated</span>{" "}
+        {formatRelativeTime(updatedAt, now)}
+      </p>
+      <p title={dateTimeTitle(row.submitted_at)}>
+        <span class="text-slate-500">Received</span>{" "}
+        {formatRelativeTime(row.submitted_at, now)}
+      </p>
     </div>
 
-    <div class="min-w-0 space-y-2">
-      <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500 lg:hidden">Workflow</p>
-      <span class="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-xs font-medium capitalize text-slate-800">
-        {formatApplicationStatusLabel(row.status)}
-      </span>
-      <div>
-        <p class="mb-1 text-[11px] text-slate-500">Clarification</p>
+    <div class="min-w-0">
+      <p class="mb-1.5 text-xs font-medium uppercase tracking-wide text-slate-500 lg:hidden">Workflow</p>
+      <div class="flex flex-wrap items-center gap-1.5">
+        <span class="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-xs font-medium capitalize text-slate-800">
+          {formatApplicationStatusLabel(row.status)}
+        </span>
         <ApplicationInboxClarificationBadge
           status={row.clarification_status}
           requestedAt={row.clarification_requested_at}
@@ -81,7 +82,7 @@ const detailHref = `/recruiter/applications/${row.id}`;
     </div>
 
     <div class="min-w-0">
-      <p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500 lg:hidden">AI scores</p>
+      <p class="mb-1 text-xs font-medium uppercase tracking-wide text-slate-500 lg:hidden">AI scores</p>
       <ApplicationInboxAiScores
         cvFitScore={row.cv_fit_score}
         requiredSkillsScore={row.required_skills_score}

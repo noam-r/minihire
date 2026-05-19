@@ -1,5 +1,6 @@
 ---
 import { formatClarificationInboxDisplay } from "../../lib/recruiter-applications-list";
+import { formatSubmittedAt } from "../../lib/recruiter-application-display";
 import { formatRelativeTime } from "../../lib/relative-time";
 
 interface Props {
@@ -19,19 +20,24 @@ const variantClasses: Record<typeof display.variant, string> = {
   attention: "border-slate-300 bg-slate-100 text-slate-700",
 };
 
+const requestedTitle = (() => {
+  const formatted = formatSubmittedAt(requestedAt);
+  return formatted !== "N/A" ? formatted : undefined;
+})();
+
 const tooltip =
   display.variant === "waiting" && requestedAt
-    ? `Sent ${formatRelativeTime(requestedAt, now)}`
+    ? requestedTitle
+      ? `Sent ${formatRelativeTime(requestedAt, now)} · ${requestedTitle}`
+      : `Sent ${formatRelativeTime(requestedAt, now)}`
     : undefined;
 ---
 
 {
-  display.variant === "empty" ? (
-    <span class="text-xs text-slate-400" title="No clarification requested">—</span>
-  ) : (
+  display.variant !== "empty" && (
     <span
       class:list={[
-        "inline-flex max-w-full items-center rounded-full border px-2 py-0.5 text-[11px] font-medium leading-tight",
+        "inline-flex max-w-full items-center rounded-full border px-2.5 py-0.5 text-xs font-medium leading-tight",
         variantClasses[display.variant],
       ]}
       title={tooltip}
