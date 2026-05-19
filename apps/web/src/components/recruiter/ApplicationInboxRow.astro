@@ -6,8 +6,8 @@ import {
   formatApplicationStatusLabel,
 } from "../../lib/recruiter-applications-list";
 import {
-  applicationInboxGridClass,
-  applicationInboxGridPaddingClass,
+  applicationInboxDataCellClass,
+  applicationInboxMobileCardClass,
 } from "../../lib/application-inbox-layout";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../lib/relative-time";
 import ApplicationInboxAiScores from "./ApplicationInboxAiScores.astro";
@@ -17,9 +17,10 @@ import WarningTriangleIcon from "./WarningTriangleIcon.astro";
 interface Props {
   row: ApplicationRecord;
   now: Date;
+  layout?: "mobile" | "desktop";
 }
 
-const { row, now } = Astro.props;
+const { row, now, layout = "mobile" } = Astro.props;
 
 const job = row.expand?.job as { title?: string } | undefined;
 const evaluated = applicationHasAiScores(row);
@@ -31,17 +32,11 @@ const updatedTooltip = formatDateTimeTooltip(updatedAt);
 const receivedTooltip = formatDateTimeTooltip(row.submitted_at);
 ---
 
-<article class="border-b border-slate-100 last:border-0">
-  <div
-    class:list={[
-      "grid gap-y-3 py-3",
-      applicationInboxGridPaddingClass,
-      applicationInboxGridClass,
-      "lg:items-center",
-    ]}
-  >
+{
+  layout === "mobile" ? (
+  <article class={applicationInboxMobileCardClass}>
     <div class="min-w-0 space-y-0.5">
-      <p class="text-xs font-medium uppercase tracking-wide text-slate-500 lg:hidden">Candidate</p>
+      <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Candidate</p>
       <div class="flex items-start gap-1.5">
         {
           hasWarnings && (
@@ -61,8 +56,8 @@ const receivedTooltip = formatDateTimeTooltip(row.submitted_at);
       <p class="truncate text-sm text-slate-600">{job?.title ?? "—"}</p>
     </div>
 
-    <div class="space-y-0.5 whitespace-nowrap text-sm text-slate-700">
-      <p class="text-xs font-medium uppercase tracking-wide text-slate-500 lg:hidden">Dates</p>
+    <div class="space-y-0.5 text-sm text-slate-700">
+      <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Dates</p>
       <p>
         <span class="text-slate-500">Updated</span>{" "}
         <span
@@ -84,7 +79,7 @@ const receivedTooltip = formatDateTimeTooltip(row.submitted_at);
     </div>
 
     <div>
-      <p class="mb-1.5 text-xs font-medium uppercase tracking-wide text-slate-500 lg:hidden">Workflow</p>
+      <p class="mb-1.5 text-xs font-medium uppercase tracking-wide text-slate-500">Workflow</p>
       <div class="flex flex-wrap items-center gap-1.5">
         <span class="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-xs font-medium capitalize text-slate-800">
           {formatApplicationStatusLabel(row.status)}
@@ -97,8 +92,74 @@ const receivedTooltip = formatDateTimeTooltip(row.submitted_at);
       </div>
     </div>
 
-    <div class="min-w-0">
-      <p class="mb-1 text-xs font-medium uppercase tracking-wide text-slate-500 lg:hidden">AI scores</p>
+    <ApplicationInboxAiScores
+      cvFitScore={row.cv_fit_score}
+      requiredSkillsScore={row.required_skills_score}
+      niceToHaveScore={row.nice_to_have_score}
+      evaluated={evaluated}
+    />
+
+    <a class="btn-primary btn-sm inline-flex w-full justify-center no-underline" href={detailHref}>
+      Open
+    </a>
+  </article>
+  ) : (
+    <>
+    <div class:list={[applicationInboxDataCellClass, "min-w-0"]}>
+      <div class="flex items-start gap-1.5">
+        {
+          hasWarnings && (
+            <WarningTriangleIcon
+              class="mt-0.5 h-4 w-4 shrink-0 text-amber-600"
+              title="Location or contact details may not match the role"
+            />
+          )
+        }
+        <div class="min-w-0">
+          <a class="text-sm font-semibold text-slate-900 hover:text-teal-900" href={detailHref}>
+            {row.full_name}
+          </a>
+          <p class="truncate text-sm text-slate-500">{row.email}</p>
+        </div>
+      </div>
+      <p class="truncate text-sm text-slate-600">{job?.title ?? "—"}</p>
+    </div>
+
+    <div class:list={[applicationInboxDataCellClass, "space-y-0.5 whitespace-nowrap text-sm text-slate-700"]}>
+      <p>
+        <span class="text-slate-500">Updated</span>{" "}
+        <span
+          class:list={[updatedTooltip && "cursor-help underline decoration-dotted decoration-slate-300 underline-offset-2"]}
+          {...updatedTooltip ? { title: updatedTooltip } : {}}
+        >
+          {formatRelativeTime(updatedAt, now)}
+        </span>
+      </p>
+      <p>
+        <span class="text-slate-500">Received</span>{" "}
+        <span
+          class:list={[receivedTooltip && "cursor-help underline decoration-dotted decoration-slate-300 underline-offset-2"]}
+          {...receivedTooltip ? { title: receivedTooltip } : {}}
+        >
+          {formatRelativeTime(row.submitted_at, now)}
+        </span>
+      </p>
+    </div>
+
+    <div class={applicationInboxDataCellClass}>
+      <div class="flex flex-wrap items-center gap-1.5">
+        <span class="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-xs font-medium capitalize text-slate-800">
+          {formatApplicationStatusLabel(row.status)}
+        </span>
+        <ApplicationInboxClarificationBadge
+          status={row.clarification_status}
+          requestedAt={row.clarification_requested_at}
+          now={now}
+        />
+      </div>
+    </div>
+
+    <div class:list={[applicationInboxDataCellClass, "min-w-0"]}>
       <ApplicationInboxAiScores
         cvFitScore={row.cv_fit_score}
         requiredSkillsScore={row.required_skills_score}
@@ -107,10 +168,11 @@ const receivedTooltip = formatDateTimeTooltip(row.submitted_at);
       />
     </div>
 
-    <div class="flex items-center lg:justify-end">
-      <a class="btn-primary btn-sm inline-flex w-full justify-center no-underline sm:w-auto" href={detailHref}>
+    <div class:list={[applicationInboxDataCellClass, "flex justify-end"]}>
+      <a class="btn-primary btn-sm inline-flex no-underline" href={detailHref}>
         Open
       </a>
     </div>
-  </div>
-</article>
+    </>
+  )
+}

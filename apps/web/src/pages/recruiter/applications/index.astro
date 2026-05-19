@@ -1,8 +1,8 @@
 ---
 import ApplicationInboxRow from "../../../components/recruiter/ApplicationInboxRow.astro";
 import {
-  applicationInboxGridClass,
-  applicationInboxGridPaddingClass,
+  applicationInboxHeaderCellClass,
+  applicationInboxTableClass,
 } from "../../../lib/application-inbox-layout";
 import RecruiterLayout from "../../../layouts/RecruiterLayout.astro";
 import type { ApplicationRecord } from "../../../lib/applications";
@@ -178,28 +178,29 @@ const clarificationFilterLabels: Record<(typeof APPLICATIONS_LIST_CLARIFICATION_
   </form>
 
   <div class="mt-8 overflow-hidden rounded-lg border border-slate-200 bg-white">
-    <div
-      class:list={[
-        "hidden border-b border-slate-200 bg-slate-50 py-3 text-xs font-medium uppercase tracking-wide text-slate-600",
-        applicationInboxGridPaddingClass,
-        applicationInboxGridClass,
-        "lg:items-center",
-      ]}
-    >
-      <span>Candidate</span>
-      <span>Dates</span>
-      <span>Workflow</span>
-      <span>AI scores</span>
-      <span class="text-right">Action</span>
-    </div>
-
     {
       list.items.length === 0 ? (
         <p class="px-4 py-8 text-sm text-slate-600">
           {hasActiveFilters ? "No applications match your filters." : "No applications yet."}
         </p>
       ) : (
-        list.items.map((row) => <ApplicationInboxRow row={row} now={now} />)
+        <>
+          <div class="lg:hidden">
+            {list.items.map((row) => (
+              <ApplicationInboxRow row={row} now={now} layout="mobile" />
+            ))}
+          </div>
+          <div class={applicationInboxTableClass}>
+            <span class={applicationInboxHeaderCellClass}>Candidate</span>
+            <span class={applicationInboxHeaderCellClass}>Dates</span>
+            <span class={applicationInboxHeaderCellClass}>Workflow</span>
+            <span class={applicationInboxHeaderCellClass}>AI scores</span>
+            <span class:list={[applicationInboxHeaderCellClass, "text-right"]}>Action</span>
+            {list.items.map((row) => (
+              <ApplicationInboxRow row={row} now={now} layout="desktop" />
+            ))}
+          </div>
+        </>
       )
     }
   </div>
