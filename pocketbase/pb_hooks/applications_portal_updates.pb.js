@@ -1,7 +1,9 @@
 /// <reference path="../pb_data/types.d.ts" />
 
+const PORTAL_APPLICATION_UPDATE_FIELDS = new Set(["status", "starred"]);
+
 /**
- * Portal recruiters (PocketBase `users` auth) may only PATCH `applications.status`.
+ * Portal recruiters (PocketBase `users` auth) may only PATCH allowlisted fields on `applications`.
  * Superusers bypass this check. `submission_service` does not hit update (rules deny).
  */
 onRecordUpdateRequest((e) => {
@@ -22,8 +24,10 @@ onRecordUpdateRequest((e) => {
 
   const body = e.requestInfo().body || {};
   for (const key of Object.keys(body)) {
-    if (key !== "status") {
-      throw new BadRequestError("portal users may only update the status field on applications");
+    if (!PORTAL_APPLICATION_UPDATE_FIELDS.has(key)) {
+      throw new BadRequestError(
+        "portal users may only update status and starred on applications",
+      );
     }
   }
 

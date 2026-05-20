@@ -36,6 +36,7 @@ export type ApplicationsListParams = {
   job: string;
   status: string;
   clarification: string;
+  starred: string;
 };
 
 export type ClarificationInboxVariant = "empty" | "waiting" | "answered" | "attention";
@@ -70,6 +71,7 @@ export function parseApplicationsListParams(searchParams: URLSearchParams): Appl
   const dir: ApplicationsListSortDirection = dirRaw === "asc" ? "asc" : "desc";
 
   const clarificationRaw = String(searchParams.get("clarification") ?? "").trim();
+  const starredRaw = String(searchParams.get("starred") ?? "").trim();
 
   return {
     page,
@@ -83,6 +85,7 @@ export function parseApplicationsListParams(searchParams: URLSearchParams): Appl
     )
       ? clarificationRaw
       : "",
+    starred: starredRaw === "1" ? "1" : "",
   };
 }
 
@@ -133,7 +136,7 @@ export function formatClarificationInboxDisplay(
 
 export function buildApplicationsListFilter(
   pb: PocketBase,
-  params: Pick<ApplicationsListParams, "q" | "job" | "status" | "clarification">,
+  params: Pick<ApplicationsListParams, "q" | "job" | "status" | "clarification" | "starred">,
 ): string | undefined {
   const clauses: string[] = [];
 
@@ -152,6 +155,10 @@ export function buildApplicationsListFilter(
 
   if (params.clarification && isApplicationsListClarificationFilter(params.clarification)) {
     clauses.push(buildClarificationListFilterClause(params.clarification));
+  }
+
+  if (params.starred === "1") {
+    clauses.push("starred = true");
   }
 
   if (!clauses.length) {
@@ -193,6 +200,9 @@ export function applicationsListQueryString(
   }
   if (merged.clarification) {
     qs.set("clarification", merged.clarification);
+  }
+  if (merged.starred) {
+    qs.set("starred", merged.starred);
   }
   if (overrides.error) {
     qs.set("error", overrides.error);

@@ -7,6 +7,7 @@ export const recruiterApplicationsIndexErrors: Record<string, string> = {
 
 /** `?error=` codes on `/recruiter/applications/[id]`. */
 export const recruiterApplicationDetailErrors: Record<string, string> = {
+  star: "Could not update star.",
   status: "Status could not be updated.",
   note: "Notes must be between 1 and 8,000 characters.",
   note_save: "The note could not be saved.",

@@ -15,6 +15,7 @@ import type {
   ClarificationItemRecord,
   ClarificationRequestRecord,
 } from "../../../lib/clarification/types";
+import ApplicationStarIndicator from "../../../components/recruiter/ApplicationStarIndicator.astro";
 import RecruiterLayout from "../../../layouts/RecruiterLayout.astro";
 import type { JobRecord } from "../../../lib/ai/pocketbase";
 import {
@@ -53,6 +54,7 @@ const now = new Date();
 
 const flash = {
   updated: Astro.url.searchParams.get("updated") === "1",
+  starred_updated: Astro.url.searchParams.get("starred_updated") === "1",
   note: Astro.url.searchParams.get("note") === "1",
   aiRequested: Astro.url.searchParams.get("ai_requested") === "1",
   clarificationSent: Astro.url.searchParams.get("clarification_sent") === "1",
@@ -107,6 +109,7 @@ const aiContact = contactFromApplication({
 });
 const jobTitle = trimStr(job?.title) !== "" ? trimStr(job?.title) : jobId !== "" ? "Job listing" : "Application";
 const jobHref = jobId !== "" ? `/recruiter/jobs/${jobId}` : undefined;
+const isStarred = Boolean(record.starred);
 
 const githubUrl = optionalApplicantUrl(record.github_url);
 const portfolioUrl = optionalApplicantUrl(record.portfolio_url);
@@ -161,9 +164,19 @@ try {
       <span class="mx-2 text-slate-300">|</span>
       <a class="text-teal-800 hover:text-teal-900" href="/recruiter/jobs">Jobs</a>
     </p>
-    <h1 class="mt-2 text-2xl font-semibold tracking-tight text-slate-900 md:text-3xl">
-      {requiredApplicantText(record.full_name)}
-    </h1>
+    <div class="mt-2 flex flex-wrap items-center gap-2">
+      <h1 class="text-2xl font-semibold tracking-tight text-slate-900 md:text-3xl">
+        {requiredApplicantText(record.full_name)}
+      </h1>
+      {
+        isStarred && (
+          <span class="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-900">
+            <ApplicationStarIndicator filled class="h-3.5 w-3.5" title="Starred candidate" />
+            Starred
+          </span>
+        )
+      }
+    </div>
     <p class="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm text-slate-600">
       <span class="font-medium text-slate-700">Role:</span>
       {
@@ -202,6 +215,13 @@ try {
   {
     flash.updated && (
       <p class="mb-6 rounded-md border border-teal-200 bg-teal-50 px-3 py-2 text-sm text-teal-900">Status updated.</p>
+    )
+  }
+  {
+    flash.starred_updated && (
+      <p class="mb-6 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+        {isStarred ? "Candidate starred." : "Star removed."}
+      </p>
     )
   }
   {
@@ -416,7 +436,19 @@ try {
           </p>
         </header>
         <div class="space-y-5 px-5 py-5">
-          <form method="post" action="/recruiter/actions/application-status" class="space-y-3">
+          <form method="post" action="/recruiter/actions/application-star" class="space-y-2">
+            <input type="hidden" name="csrf" value={csrf} />
+            <input type="hidden" name="application_id" value={record.id} />
+            <input type="hidden" name="starred" value={isStarred ? "0" : "1"} />
+            <button
+              type="submit"
+              class="btn-secondary flex w-full items-center justify-center gap-2 py-2.5 text-sm font-semibold"
+            >
+              <ApplicationStarIndicator filled={isStarred} class="h-4 w-4" />
+              {isStarred ? "Remove star" : "Star candidate"}
+            </button>
+          </form>
+          <form method="post" action="/recruiter/actions/application-status" class="space-y-3 border-t border-teal-100/80 pt-5">
             <input type="hidden" name="csrf" value={csrf} />
             <input type="hidden" name="application_id" value={record.id} />
             <label class="block text-sm font-medium text-slate-700">

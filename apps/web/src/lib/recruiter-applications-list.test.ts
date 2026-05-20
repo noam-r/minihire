@@ -26,7 +26,7 @@ describe("parseApplicationsListParams", () => {
   it("parses filters and sort", () => {
     const params = parseApplicationsListParams(
       new URLSearchParams(
-        "page=2&sort=cv_fit&dir=asc&q=search&job=job1&status=reviewing&clarification=waiting",
+        "page=2&sort=cv_fit&dir=asc&q=search&job=job1&status=reviewing&clarification=waiting&starred=1",
       ),
     );
     assert.equal(params.page, 2);
@@ -36,6 +36,12 @@ describe("parseApplicationsListParams", () => {
     assert.equal(params.job, "job1");
     assert.equal(params.status, "reviewing");
     assert.equal(params.clarification, "waiting");
+    assert.equal(params.starred, "1");
+  });
+
+  it("ignores invalid starred filter values", () => {
+    const params = parseApplicationsListParams(new URLSearchParams("starred=yes"));
+    assert.equal(params.starred, "");
   });
 });
 
@@ -43,7 +49,10 @@ describe("buildApplicationsListFilter", () => {
   const pb = new PocketBase();
 
   it("returns undefined when no filters", () => {
-    assert.equal(buildApplicationsListFilter(pb, { q: "", job: "", status: "", clarification: "" }), undefined);
+    assert.equal(
+      buildApplicationsListFilter(pb, { q: "", job: "", status: "", clarification: "", starred: "" }),
+      undefined,
+    );
   });
 
   it("combines search, job, and status clauses", () => {
@@ -52,6 +61,7 @@ describe("buildApplicationsListFilter", () => {
       job: "job123",
       status: "new",
       clarification: "",
+      starred: "",
     });
     assert.match(filter!, /full_name ~ "applicant@"/);
     assert.match(filter!, /email ~ "applicant@"/);
@@ -65,9 +75,21 @@ describe("buildApplicationsListFilter", () => {
       job: "",
       status: "",
       clarification: "waiting",
+      starred: "",
     });
     assert.match(filter!, /clarification_status = "requested"/);
     assert.match(filter!, /clarification_status = "seen"/);
+  });
+
+  it("adds starred filter clause", () => {
+    const filter = buildApplicationsListFilter(pb, {
+      q: "",
+      job: "",
+      status: "",
+      clarification: "",
+      starred: "1",
+    });
+    assert.match(filter!, /starred = true/);
   });
 });
 
@@ -124,12 +146,14 @@ describe("applicationsListQueryString", () => {
       job: "jid",
       status: "maybe",
       clarification: "answered",
+      starred: "1",
     });
     assert.match(qs, /page=2/);
     assert.match(qs, /sort=required/);
     assert.match(qs, /dir=asc/);
     assert.match(qs, /q=test/);
     assert.match(qs, /clarification=answered/);
+    assert.match(qs, /starred=1/);
   });
 });
 

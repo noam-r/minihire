@@ -172,7 +172,7 @@ Spec: [`tmp/minihire-clarification-flow-spec.md`](tmp/minihire-clarification-flo
 
 - `jobs` is public **list/view** for **published** roles only. Authenticated portal users (`users` with `role` + `active`) can list and view jobs in any status per migration rules.
 - `application_notes` are readable and creatable from the recruiter portal; each note’s **`author`** must match the signed-in user (enforced by PocketBase rules).
-- `applications` and `email_logs` are created by the **`submission_service`** auth account used by the Astro server (not the superuser). Portal users may update **`applications.status`** only (see `pocketbase/pb_hooks/applications_portal_updates.pb.js`).
+- `applications` and `email_logs` are created by the **`submission_service`** auth account used by the Astro server (not the superuser). Portal users may update **`applications.status`** and **`applications.starred`** only (see `pocketbase/pb_hooks/applications_portal_updates.pb.js`).
 - Applications from candidates are always created through the Astro API route, not directly from the browser.
 - PocketBase's built-in plain-text field UI does not expose a configurable large Markdown textarea for `text` fields, so the schema uses clearer field names and help text rather than a custom editor.
 

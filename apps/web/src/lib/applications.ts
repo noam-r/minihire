@@ -19,6 +19,7 @@ export type ApplicationRecord = RecordModel & {
   clarification_requested_at?: string;
   clarification_seen_at?: string;
   clarification_answered_at?: string;
+  starred?: boolean;
 };
 
 export function buildDuplicateKey(email: string, jobId: string): string {

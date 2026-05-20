@@ -51,7 +51,7 @@ if (list.totalPages > 0 && listParams.page > list.totalPages) {
 }
 
 const hasActiveFilters = Boolean(
-  listParams.q || listParams.job || listParams.status || listParams.clarification,
+  listParams.q || listParams.job || listParams.status || listParams.clarification || listParams.starred,
 );
 const refreshHref = `${Astro.url.pathname}${Astro.url.search}`;
 
@@ -139,6 +139,17 @@ const clarificationFilterLabels: Record<(typeof APPLICATIONS_LIST_CLARIFICATION_
               {clarificationFilterLabels[value]}
             </option>
           ))}
+        </select>
+      </div>
+      <div>
+        <label class="mb-1 block text-xs font-medium text-slate-600" for="filter-starred">Starred</label>
+        <select
+          id="filter-starred"
+          name="starred"
+          class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600"
+        >
+          <option value="" selected={!listParams.starred}>All</option>
+          <option value="1" selected={listParams.starred === "1"}>Starred only</option>
         </select>
       </div>
       <div>
