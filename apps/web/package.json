@@ -18,7 +18,7 @@
     "ai:github": "tsx scripts/ai-github.ts",
     "ai:worker": "tsx scripts/ai-worker.ts",
     "enqueue-ai-evaluations": "tsx scripts/enqueue-ai-evaluations.ts",
-    "test": "node --import tsx --test 'src/lib/ai/**/*.test.ts' 'src/lib/recruiter-ai/**/*.test.ts' 'src/lib/recruiter-applications-list.test.ts' 'src/lib/relative-time.test.ts' 'src/lib/clarification/**/*.test.ts'",
+    "test": "node --import tsx --test 'src/lib/ai/**/*.test.ts' 'src/lib/recruiter-ai/**/*.test.ts' 'src/lib/recruiter-applications-list.test.ts' 'src/lib/relative-time.test.ts' 'src/lib/clarification/**/*.test.ts' 'src/lib/recruiter-candidate-email/**/*.test.ts'",
     "backfill:application-list-fields": "tsx scripts/backfill-application-list-fields.ts"
   },
   "dependencies": {

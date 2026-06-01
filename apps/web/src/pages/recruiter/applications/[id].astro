@@ -16,6 +16,7 @@ import type {
   ClarificationRequestRecord,
 } from "../../../lib/clarification/types";
 import ApplicationStarIndicator from "../../../components/recruiter/ApplicationStarIndicator.astro";
+import RecruiterCandidateEmailPanel from "../../../components/recruiter/RecruiterCandidateEmailPanel.astro";
 import RecruiterLayout from "../../../layouts/RecruiterLayout.astro";
 import type { JobRecord } from "../../../lib/ai/pocketbase";
 import {
@@ -24,6 +25,7 @@ import {
 } from "../../../lib/recruiter-ai/build-evidence-rationale-view";
 import { APPLICATION_STATUSES } from "../../../lib/application-statuses";
 import { loadRecruiterAiSnapshot } from "../../../lib/recruiter-ai/load-snapshot";
+import { listRecruiterCandidateEmailsForApplication } from "../../../lib/recruiter-candidate-email/email-logs";
 import {
   cvFilename,
   formatConsent,
@@ -59,6 +61,8 @@ const flash = {
   aiRequested: Astro.url.searchParams.get("ai_requested") === "1",
   clarificationSent: Astro.url.searchParams.get("clarification_sent") === "1",
   clarificationCancelled: Astro.url.searchParams.get("clarification_cancelled") === "1",
+  emailSent: Astro.url.searchParams.get("email_sent") === "1",
+  emailStatusUpdated: Astro.url.searchParams.get("status_updated") === "1",
   error: Astro.url.searchParams.get("error"),
 };
 
@@ -118,6 +122,13 @@ const linkedinUrl = optionalApplicantUrl(record.linkedin_url);
 const aiSnapshot = await loadRecruiterAiSnapshot(pb, id);
 const aiAutoRefresh = aiSnapshot.state === "in_progress";
 const aiFullDetailHref = `/recruiter/applications/${id}/ai`;
+
+let candidateEmailHistory: Awaited<ReturnType<typeof listRecruiterCandidateEmailsForApplication>> = [];
+try {
+  candidateEmailHistory = await listRecruiterCandidateEmailsForApplication(id);
+} catch (error) {
+  console.error("Load candidate email history:", error);
+}
 
 let clarificationRequests: ClarificationRequestRecord[] = [];
 let activeClarification: ClarificationRequestRecord | null = null;
@@ -247,6 +258,14 @@ try {
     flash.clarificationCancelled && (
       <p class="mb-6 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800">
         Undelivered clarification cancelled. You can send a new request.
+      </p>
+    )
+  }
+  {
+    flash.emailSent && (
+      <p class="mb-6 rounded-md border border-teal-200 bg-teal-50 px-3 py-2 text-sm text-teal-900">
+        Email sent to the candidate.
+        {flash.emailStatusUpdated ? " Application status set to rejected." : ""}
       </p>
     )
   }
@@ -481,6 +500,12 @@ try {
           </div>
         </div>
       </section>
+
+      <RecruiterCandidateEmailPanel
+        applicationId={record.id}
+        history={candidateEmailHistory}
+        now={now}
+      />
 
       <RecruiterAiPanel
         applicationId={record.id}
