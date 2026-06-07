@@ -1,5 +1,6 @@
 import type PocketBase from "pocketbase";
 import type { RecordModel } from "pocketbase";
+import { ClientResponseError } from "pocketbase";
 
 import { splitLinesToList } from "../sanitize";
 import type { NormalizedJob } from "./shared/types";
@@ -53,7 +54,17 @@ export async function loadApplication(
 }
 
 export async function loadJob(pb: PocketBase, jobId: string): Promise<JobRecord> {
-  return pb.collection("jobs").getOne<JobRecord>(jobId);
+  try {
+    return await pb.collection("jobs").getOne<JobRecord>(jobId);
+  } catch (error) {
+    if (error instanceof ClientResponseError && error.status === 404) {
+      throw new Error(
+        `Job ${jobId} could not be loaded (missing or not readable by submission_service). ` +
+          "Ensure migration 1747067600_jobs_submission_service_read is applied and PocketBase was restarted.",
+      );
+    }
+    throw error;
+  }
 }
 
 export function mapNormalizedJob(record: JobRecord): NormalizedJob {
