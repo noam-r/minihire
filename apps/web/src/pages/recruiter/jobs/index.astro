@@ -7,7 +7,8 @@ import { getCompanyName } from "../../../lib/site";
 
 export const prerender = false;
 
-const { pb } = Astro.locals.recruiter!;
+const { pb, user } = Astro.locals.recruiter!;
+const isAdmin = user.role === "admin";
 const companyName = getCompanyName();
 const now = new Date();
 
@@ -29,7 +30,10 @@ const [jobs, appCountByJob] = await Promise.all([
       <h1 class="text-2xl font-semibold text-slate-900">Jobs</h1>
       <p class="mt-1 text-sm text-slate-600">All roles including drafts and archived.</p>
     </div>
-    <a class="btn-secondary btn-sm" href="/recruiter/applications">View applications inbox</a>
+    <div class="flex flex-wrap gap-2">
+      {isAdmin && <a class="btn-primary btn-sm" href="/recruiter/jobs/new">New job</a>}
+      <a class="btn-secondary btn-sm" href="/recruiter/applications">View applications inbox</a>
+    </div>
   </div>
 
   {

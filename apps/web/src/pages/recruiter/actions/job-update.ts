@@ -2,9 +2,8 @@ import type { APIRoute } from "astro";
 import { ClientResponseError } from "pocketbase";
 
 import { isJobStatus } from "../../../lib/job-statuses";
+import { validateJobFields } from "../../../lib/job-validation";
 import { verifySessionCsrf } from "../../../lib/recruiter-auth/csrf";
-
-const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 export const prerender = false;
 
@@ -62,17 +61,16 @@ export const POST: APIRoute = async (context) => {
   const description = pick("description", String(existing.description ?? "").trim());
   const statusRaw = body.has("status") ? String(body.get("status") ?? "").trim() : String(existing.status ?? "").trim();
 
-  if (!title || title.length > 200) {
-    return redirect(`/recruiter/jobs/${jobId}?error=fields`, 303);
-  }
-  if (!slug || !SLUG_PATTERN.test(slug) || slug.length > 120) {
-    return redirect(`/recruiter/jobs/${jobId}?error=slug`, 303);
-  }
-  if (!summary || summary.length > 1000) {
-    return redirect(`/recruiter/jobs/${jobId}?error=fields`, 303);
-  }
-  if (!description || description.length < 1) {
-    return redirect(`/recruiter/jobs/${jobId}?error=fields`, 303);
+  const validationError = validateJobFields({
+    title,
+    slug,
+    summary,
+    description,
+    workModel: "remote",
+    employmentType: "full_time",
+  });
+  if (validationError) {
+    return redirect(`/recruiter/jobs/${jobId}?error=${validationError}`, 303);
   }
   if (!isJobStatus(statusRaw)) {
     return redirect(`/recruiter/jobs/${jobId}?error=status`, 303);

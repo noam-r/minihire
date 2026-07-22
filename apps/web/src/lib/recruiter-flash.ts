@@ -25,6 +25,17 @@ export const recruiterJobsIndexErrors: Record<string, string> = {
   invalid: "That request was not valid.",
 };
 
+/** `?error=` codes on `/recruiter/jobs/new`. */
+export const recruiterJobNewErrors: Record<string, string> = {
+  form: "The form could not be read. Please try again.",
+  forbidden: "Only administrators can create job postings.",
+  fields: "Title, summary, and description are required and must meet length limits.",
+  slug: "Slug may only use lowercase letters, numbers, and hyphens between words (max 120 chars).",
+  work_model: "Please select a valid work model.",
+  employment_type: "Please select a valid employment type.",
+  create: "The job could not be created. The slug might already be in use.",
+};
+
 /** `?error=` codes on `/recruiter/jobs/[id]`. */
 export const recruiterJobDetailErrors: Record<string, string> = {
   forbidden: "Only administrators can change job postings.",
@@ -33,4 +44,10 @@ export const recruiterJobDetailErrors: Record<string, string> = {
   status: "That status value is not allowed.",
   date: "Published date could not be read.",
   update: "The job could not be saved. The slug might already be in use on another job.",
+};
+
+/** `?created=1` / `?updated=1` success messages on `/recruiter/jobs/[id]`. */
+export const recruiterJobDetailSuccess: Record<string, string> = {
+  created: "Job created as draft.",
+  updated: "Job saved.",
 };

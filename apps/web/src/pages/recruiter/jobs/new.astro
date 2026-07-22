@@ -1,0 +1,234 @@
+---
+import RecruiterLayout from "../../../layouts/RecruiterLayout.astro";
+import { recruiterJobNewErrors } from "../../../lib/recruiter-flash";
+import { ensureSessionCsrfCookie } from "../../../lib/recruiter-auth/cookies";
+import { getCompanyName } from "../../../lib/site";
+
+export const prerender = false;
+
+const { user } = Astro.locals.recruiter!;
+
+if (user.role !== "admin") {
+  return Astro.redirect("/recruiter/jobs?error=forbidden");
+}
+
+const csrf = ensureSessionCsrfCookie(Astro.cookies);
+const companyName = getCompanyName();
+
+const errorCode = Astro.url.searchParams.get("error");
+const errorMsg = errorCode ? recruiterJobNewErrors[errorCode] : undefined;
+
+// Read previously submitted field values from query params (preserved on validation error redirect)
+const sp = Astro.url.searchParams;
+const prev = {
+  title: sp.get("title") ?? "",
+  slug: sp.get("slug") ?? "",
+  summary: sp.get("summary") ?? "",
+  description: sp.get("description") ?? "",
+  work_model: sp.get("work_model") ?? "",
+  employment_type: sp.get("employment_type") ?? "",
+  work_location: sp.get("work_location") ?? "",
+  required_skills: sp.get("required_skills") ?? "",
+  nice_to_have_skills: sp.get("nice_to_have_skills") ?? "",
+  what_to_expect: sp.get("what_to_expect") ?? "",
+  hiring_process: sp.get("hiring_process") ?? "",
+};
+---
+
+<RecruiterLayout title={`New job | ${companyName}`}>
+  <p class="text-sm text-slate-600">
+    <a class="text-teal-800 hover:text-teal-900" href="/recruiter/jobs">← Jobs</a>
+  </p>
+
+  <h1 class="mt-4 text-2xl font-semibold text-slate-900">Create a new job</h1>
+
+  {
+    errorMsg && (
+      <p class="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">{errorMsg}</p>
+    )
+  }
+
+  <form
+    action="/recruiter/actions/job-create"
+    method="POST"
+    enctype="multipart/form-data"
+    class="mt-6 max-w-2xl space-y-6"
+  >
+    <input type="hidden" name="csrf" value={csrf} />
+
+    <!-- Title -->
+    <div>
+      <label for="title" class="block text-sm font-medium text-slate-700">
+        Title <span class="text-red-600">*</span>
+      </label>
+      <input
+        type="text"
+        id="title"
+        name="title"
+        required
+        maxlength="200"
+        value={prev.title}
+        class="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+      />
+    </div>
+
+    <!-- Slug -->
+    <div>
+      <label for="slug" class="block text-sm font-medium text-slate-700">
+        Slug <span class="text-red-600">*</span>
+      </label>
+      <input
+        type="text"
+        id="slug"
+        name="slug"
+        required
+        maxlength="120"
+        value={prev.slug}
+        class="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+      />
+    </div>
+
+    <!-- Summary -->
+    <div>
+      <label for="summary" class="block text-sm font-medium text-slate-700">
+        Summary <span class="text-red-600">*</span>
+      </label>
+      <textarea
+        id="summary"
+        name="summary"
+        required
+        maxlength="1000"
+        rows="3"
+        class="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+      >{prev.summary}</textarea>
+    </div>
+
+    <!-- Description -->
+    <div>
+      <label for="description" class="block text-sm font-medium text-slate-700">
+        Description <span class="text-red-600">*</span>
+      </label>
+      <textarea
+        id="description"
+        name="description"
+        required
+        rows="6"
+        class="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+      >{prev.description}</textarea>
+    </div>
+
+    <!-- Work Model -->
+    <div>
+      <label for="work_model" class="block text-sm font-medium text-slate-700">
+        Work model <span class="text-red-600">*</span>
+      </label>
+      <select
+        id="work_model"
+        name="work_model"
+        required
+        class="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+      >
+        <option value="" disabled selected={!prev.work_model}>Select work model</option>
+        <option value="remote" selected={prev.work_model === "remote"}>remote</option>
+        <option value="hybrid" selected={prev.work_model === "hybrid"}>hybrid</option>
+        <option value="onsite" selected={prev.work_model === "onsite"}>onsite</option>
+      </select>
+    </div>
+
+    <!-- Employment Type -->
+    <div>
+      <label for="employment_type" class="block text-sm font-medium text-slate-700">
+        Employment type <span class="text-red-600">*</span>
+      </label>
+      <select
+        id="employment_type"
+        name="employment_type"
+        required
+        class="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+      >
+        <option value="" disabled selected={!prev.employment_type}>Select employment type</option>
+        <option value="full_time" selected={prev.employment_type === "full_time"}>full_time</option>
+        <option value="part_time" selected={prev.employment_type === "part_time"}>part_time</option>
+        <option value="contract" selected={prev.employment_type === "contract"}>contract</option>
+        <option value="internship" selected={prev.employment_type === "internship"}>internship</option>
+      </select>
+    </div>
+
+    <!-- Work Location -->
+    <div>
+      <label for="work_location" class="block text-sm font-medium text-slate-700">
+        Work location
+      </label>
+      <input
+        type="text"
+        id="work_location"
+        name="work_location"
+        value={prev.work_location}
+        class="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+      />
+    </div>
+
+    <!-- Required Skills -->
+    <div>
+      <label for="required_skills" class="block text-sm font-medium text-slate-700">
+        Required skills
+      </label>
+      <textarea
+        id="required_skills"
+        name="required_skills"
+        rows="4"
+        placeholder="One skill per line"
+        class="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+      >{prev.required_skills}</textarea>
+    </div>
+
+    <!-- Nice-to-have Skills -->
+    <div>
+      <label for="nice_to_have_skills" class="block text-sm font-medium text-slate-700">
+        Nice-to-have skills
+      </label>
+      <textarea
+        id="nice_to_have_skills"
+        name="nice_to_have_skills"
+        rows="4"
+        placeholder="One skill per line"
+        class="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+      >{prev.nice_to_have_skills}</textarea>
+    </div>
+
+    <!-- What to Expect -->
+    <div>
+      <label for="what_to_expect" class="block text-sm font-medium text-slate-700">
+        What to expect
+      </label>
+      <textarea
+        id="what_to_expect"
+        name="what_to_expect"
+        rows="4"
+        class="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+      >{prev.what_to_expect}</textarea>
+    </div>
+
+    <!-- Hiring Process -->
+    <div>
+      <label for="hiring_process" class="block text-sm font-medium text-slate-700">
+        Hiring process
+      </label>
+      <textarea
+        id="hiring_process"
+        name="hiring_process"
+        rows="4"
+        class="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+      >{prev.hiring_process}</textarea>
+    </div>
+
+    <div class="pt-2">
+      <button
+        type="submit"
+        class="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-teal-800 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2"
+      >
+        Create job
+      </button>
+    </div>
+  </form>
+</RecruiterLayout>
