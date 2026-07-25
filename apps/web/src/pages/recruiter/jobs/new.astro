@@ -18,21 +18,36 @@ const companyName = getCompanyName();
 const errorCode = Astro.url.searchParams.get("error");
 const errorMsg = errorCode ? recruiterJobNewErrors[errorCode] : undefined;
 
-// Read previously submitted field values from query params (preserved on validation error redirect)
-const sp = Astro.url.searchParams;
-const prev = {
-  title: sp.get("title") ?? "",
-  slug: sp.get("slug") ?? "",
-  summary: sp.get("summary") ?? "",
-  description: sp.get("description") ?? "",
-  work_model: sp.get("work_model") ?? "",
-  employment_type: sp.get("employment_type") ?? "",
-  work_location: sp.get("work_location") ?? "",
-  required_skills: sp.get("required_skills") ?? "",
-  nice_to_have_skills: sp.get("nice_to_have_skills") ?? "",
-  what_to_expect: sp.get("what_to_expect") ?? "",
-  hiring_process: sp.get("hiring_process") ?? "",
+// Read previously submitted field values from cookie (set by the action on error redirect).
+// This avoids exposing form data in the URL bar.
+const FORM_COOKIE = "minihire_job_new_form";
+let prev: Record<string, string> = {
+  title: "",
+  slug: "",
+  summary: "",
+  description: "",
+  work_model: "",
+  employment_type: "",
+  work_location: "",
+  required_skills: "",
+  nice_to_have_skills: "",
+  what_to_expect: "",
+  hiring_process: "",
 };
+
+const formCookie = Astro.cookies.get(FORM_COOKIE)?.value;
+if (formCookie) {
+  try {
+    const parsed = JSON.parse(formCookie);
+    if (parsed && typeof parsed === "object") {
+      prev = { ...prev, ...parsed };
+    }
+  } catch {
+    // Ignore malformed cookie
+  }
+  // Clear the cookie after reading — it's one-time use
+  Astro.cookies.delete(FORM_COOKIE, { path: "/recruiter" });
+}
 ---
 
 <RecruiterLayout title={`New job | ${companyName}`}>
@@ -84,8 +99,10 @@ const prev = {
         required
         maxlength="120"
         value={prev.slug}
+        placeholder="e.g. senior-frontend-engineer"
         class="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
       />
+      <p class="mt-1 text-xs text-slate-500">Lowercase letters, numbers, and hyphens only.</p>
     </div>
 
     <!-- Summary -->
@@ -129,9 +146,9 @@ const prev = {
         class="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
       >
         <option value="" disabled selected={!prev.work_model}>Select work model</option>
-        <option value="remote" selected={prev.work_model === "remote"}>remote</option>
-        <option value="hybrid" selected={prev.work_model === "hybrid"}>hybrid</option>
-        <option value="onsite" selected={prev.work_model === "onsite"}>onsite</option>
+        <option value="remote" selected={prev.work_model === "remote"}>Remote</option>
+        <option value="hybrid" selected={prev.work_model === "hybrid"}>Hybrid</option>
+        <option value="onsite" selected={prev.work_model === "onsite"}>On-site</option>
       </select>
     </div>
 
@@ -147,10 +164,10 @@ const prev = {
         class="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
       >
         <option value="" disabled selected={!prev.employment_type}>Select employment type</option>
-        <option value="full_time" selected={prev.employment_type === "full_time"}>full_time</option>
-        <option value="part_time" selected={prev.employment_type === "part_time"}>part_time</option>
-        <option value="contract" selected={prev.employment_type === "contract"}>contract</option>
-        <option value="internship" selected={prev.employment_type === "internship"}>internship</option>
+        <option value="full_time" selected={prev.employment_type === "full_time"}>Full-time</option>
+        <option value="part_time" selected={prev.employment_type === "part_time"}>Part-time</option>
+        <option value="contract" selected={prev.employment_type === "contract"}>Contract</option>
+        <option value="internship" selected={prev.employment_type === "internship"}>Internship</option>
       </select>
     </div>
 
@@ -164,6 +181,7 @@ const prev = {
         id="work_location"
         name="work_location"
         value={prev.work_location}
+        placeholder="e.g. Tel Aviv, Israel"
         class="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
       />
     </div>

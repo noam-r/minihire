@@ -21,6 +21,7 @@ backups
 .idea/
 *.swp
 *.swo
+.kiro/
 
 # Test / coverage (if added later)
 coverage/

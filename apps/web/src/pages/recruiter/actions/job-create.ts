@@ -2,9 +2,26 @@ import type { APIRoute } from "astro";
 import { ClientResponseError } from "pocketbase";
 
 import { validateJobFields } from "../../../lib/job-validation";
+import { RECRUITER_COOKIE_PATH } from "../../../lib/recruiter-auth/constants";
 import { verifySessionCsrf } from "../../../lib/recruiter-auth/csrf";
 
+const FORM_COOKIE = "minihire_job_new_form";
+
 export const prerender = false;
+
+/**
+ * Stores submitted form values in a short-lived cookie so the form page
+ * can repopulate fields after a redirect. This avoids leaking user data
+ * into the URL bar and prevents potential XSS via query parameters.
+ */
+function setFormCookie(context: Parameters<APIRoute>[0], fields: Record<string, string>): void {
+  context.cookies.set(FORM_COOKIE, JSON.stringify(fields), {
+    path: RECRUITER_COOKIE_PATH,
+    httpOnly: true,
+    sameSite: "lax",
+    maxAge: 120, // 2 minutes — enough to survive the redirect
+  });
+}
 
 export const POST: APIRoute = async (context) => {
   const { request, redirect, locals } = context;
@@ -41,6 +58,20 @@ export const POST: APIRoute = async (context) => {
   const whatToExpect = String(body.get("what_to_expect") ?? "").trim();
   const hiringProcess = String(body.get("hiring_process") ?? "").trim();
 
+  const formFields: Record<string, string> = {
+    title,
+    slug,
+    summary,
+    description,
+    work_model: workModel,
+    employment_type: employmentType,
+    work_location: workLocation,
+    required_skills: requiredSkills,
+    nice_to_have_skills: niceToHaveSkills,
+    what_to_expect: whatToExpect,
+    hiring_process: hiringProcess,
+  };
+
   const validationError = validateJobFields({
     title,
     slug,
@@ -51,20 +82,8 @@ export const POST: APIRoute = async (context) => {
   });
 
   if (validationError) {
-    const params = new URLSearchParams();
-    params.set("error", validationError);
-    params.set("title", title);
-    params.set("slug", slug);
-    params.set("summary", summary);
-    params.set("description", description);
-    params.set("work_model", workModel);
-    params.set("employment_type", employmentType);
-    params.set("work_location", workLocation);
-    params.set("required_skills", requiredSkills);
-    params.set("nice_to_have_skills", niceToHaveSkills);
-    params.set("what_to_expect", whatToExpect);
-    params.set("hiring_process", hiringProcess);
-    return redirect(`/recruiter/jobs/new?${params.toString()}`, 303);
+    setFormCookie(context, formFields);
+    return redirect(`/recruiter/jobs/new?error=${validationError}`, 303);
   }
 
   const payload = {
@@ -88,25 +107,19 @@ export const POST: APIRoute = async (context) => {
     const newRecord = await pb.collection("jobs").create(payload);
     return redirect(`/recruiter/jobs/${newRecord.id}?created=1`, 303);
   } catch (error) {
+    let errorCode = "create";
     if (error instanceof ClientResponseError) {
       console.error("Job create:", error.response);
+      // Surface specific PocketBase errors
+      const data = error.response?.data as Record<string, { code?: string; message?: string }> | undefined;
+      if (data?.slug?.code === "validation_not_unique") {
+        errorCode = "slug_taken";
+      }
     } else {
       console.error("Job create:", error);
     }
 
-    const params = new URLSearchParams();
-    params.set("error", "create");
-    params.set("title", title);
-    params.set("slug", slug);
-    params.set("summary", summary);
-    params.set("description", description);
-    params.set("work_model", workModel);
-    params.set("employment_type", employmentType);
-    params.set("work_location", workLocation);
-    params.set("required_skills", requiredSkills);
-    params.set("nice_to_have_skills", niceToHaveSkills);
-    params.set("what_to_expect", whatToExpect);
-    params.set("hiring_process", hiringProcess);
-    return redirect(`/recruiter/jobs/new?${params.toString()}`, 303);
+    setFormCookie(context, formFields);
+    return redirect(`/recruiter/jobs/new?error=${errorCode}`, 303);
   }
 };

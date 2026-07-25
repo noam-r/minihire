@@ -29,11 +29,12 @@ export const recruiterJobsIndexErrors: Record<string, string> = {
 export const recruiterJobNewErrors: Record<string, string> = {
   form: "The form could not be read. Please try again.",
   forbidden: "Only administrators can create job postings.",
-  fields: "Title, summary, and description are required and must meet length limits.",
-  slug: "Slug may only use lowercase letters, numbers, and hyphens between words (max 120 chars).",
-  work_model: "Please select a valid work model.",
-  employment_type: "Please select a valid employment type.",
-  create: "The job could not be created. The slug might already be in use.",
+  fields: "Title (max 200 chars), summary (max 1,000 chars), and description are required. Please check those fields and try again.",
+  slug: "Slug is required and may only contain lowercase letters, numbers, and hyphens between words (max 120 chars). Example: senior-frontend-engineer",
+  work_model: "Please select a valid work model (remote, hybrid, or onsite).",
+  employment_type: "Please select a valid employment type (full_time, part_time, contract, or internship).",
+  slug_taken: "A job with this slug already exists. Please choose a different slug.",
+  create: "The job could not be created due to a server error. Please try again or contact support.",
 };
 
 /** `?error=` codes on `/recruiter/jobs/[id]`. */
