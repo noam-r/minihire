@@ -32,6 +32,8 @@ const PER_PAGE = 25;
 const filter = buildApplicationsListFilter(pb, listParams);
 const sort = buildApplicationsListSort(listParams);
 
+const showArchived = Astro.url.searchParams.get("show_archived") === "1";
+
 const [list, jobs] = await Promise.all([
   pb.collection("applications").getList<ApplicationRecord>(listParams.page, PER_PAGE, {
     sort,
@@ -43,6 +45,12 @@ const [list, jobs] = await Promise.all([
     requestKey: "recruiter_applications_filter_jobs",
   }),
 ]);
+
+// By default, hide archived jobs from the dropdown to reduce clutter.
+// If a specific archived job is currently selected as a filter, always include it.
+const visibleJobs = showArchived
+  ? jobs
+  : jobs.filter((job) => job.status !== "archived" || job.id === listParams.job);
 
 if (list.totalPages > 0 && listParams.page > list.totalPages) {
   return Astro.redirect(
@@ -104,12 +112,16 @@ const clarificationFilterLabels: Record<(typeof APPLICATIONS_LIST_CLARIFICATION_
           class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600"
         >
           <option value="">All jobs</option>
-          {jobs.map((job) => (
+          {visibleJobs.map((job) => (
             <option value={job.id} selected={listParams.job === job.id}>
-              {String(job.title ?? job.id)}
+              {String(job.title ?? job.id)} ({job.slug})
             </option>
           ))}
         </select>
+        <label class="mt-1.5 flex items-center gap-1.5 text-xs text-slate-500">
+          <input type="checkbox" name="show_archived" value="1" checked={showArchived} class="rounded border-slate-300" />
+          Show archived jobs
+        </label>
       </div>
       <div>
         <label class="mb-1 block text-xs font-medium text-slate-600" for="filter-status">Status</label>
