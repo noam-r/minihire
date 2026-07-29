@@ -41,7 +41,7 @@ export const GET: APIRoute = async (context) => {
   }
 
   const contentType = upstream.headers.get("content-type") || "application/octet-stream";
-  const disposition = `attachment; filename="${String(cv).replace(/"/g, "")}"`;
+  const disposition = `inline; filename="${String(cv).replace(/"/g, "")}"`;
 
   return new Response(upstream.body, {
     status: 200,
